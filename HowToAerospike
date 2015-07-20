@@ -1,0 +1,41 @@
+#install http://www.aerospike.com/docs/operations/install/
+
+#ubuntu 
+wget -O aerospike.tgz 'http://aerospike.com/download/server/latest/artifact/ubuntu12'
+tar -xvf aerospike.tgz
+cd aerospike-server-community-*-ubuntu12*
+sudo ./asinstall 
+sudo service aerospike start 
+sudo tail -f /var/log/aerospike/aerospike.log | grep cake
+
+# install admin you will need to install zip  (apt-get install zip)
+git clone https://github.com/aerospike/aerospike-admin.git
+cd aerospike-admin/
+make
+make install
+easy_install yappi  
+
+# console
+# wget http://www.aerospike.com/artifacts/aerospike-amc-community/3.6.1/aerospike-amc-community-3.6.1.all.x86_64.deb
+apt-get install python-dev
+dpkg -i aerospike-amc-community-3.6.1.all.x86_64.deb 
+service amc start
+
+# web access http://10.50.0.99:8081/
+
+# Munin plugin
+https://github.com/thumbtack-technology/ycsb/tree/master/munin
+
+# replace clinfo or
+ln -s asinfo clinfo
+
+
+# install python client
+apt-get install libssl-dev
+pip install aerospike
+
+
+# learn more at http://www.slideshare.net/AerospikeDB/configuring-aerospike-part-1
+
+
+
