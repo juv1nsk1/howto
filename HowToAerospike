@@ -34,6 +34,8 @@ ln -s asinfo clinfo
 apt-get install libssl-dev
 pip install aerospike
 
+# setup a SSD disk https://www.aerospike.com/docs/operations/plan/ssd/ssd_setup.html
+
 
 # learn more at http://www.slideshare.net/AerospikeDB/configuring-aerospike-part-1
 
