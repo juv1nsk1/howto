@@ -1,0 +1,14 @@
+{"inputs":"swap",    
+ "query":[{"map":{"language":"javascript",
+                  "source":"function(value,keyData,arg){ var data = value; return [data];}"
+                 }},
+          {"reduce":{"language":"javascript","name":"Riak.reduceMax","keep":true}}]
+}
+
+
+{"inputs":"pfls",    
+ "query":[{"map":{"language":"javascript",
+                  "source":"function(value,keyData,arg){ var data = value; return [data];}"
+                 }},
+	{"reduce":{"language":"javascript","name":"Riak.reduceMax","keep":true}}]
+}
