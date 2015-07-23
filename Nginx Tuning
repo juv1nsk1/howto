@@ -1,3 +1,37 @@
+
+45K active connections with about 5K req/s on FreeBSD 7.1
+
+OS & Hardware
+FreeBSD 7.1
+AMD64, dual-core CPU
+4GB RAM
+Purpose
+Web server & reverse proxy
+Load description
+45K inactive keep-alive connections
+HTTP request is about 5,000 req/s, mostly small static files, all are cached by VM
+System config
+/boot/loader.conf:
+
+vm.kmem_size=1844M
+kern.maxbcache=64M
+kern.ipc.maxpipekva=4M
+/etc/sysctl.conf:
+
+kern.ipc.nmbjumbop=192000
+kern.ipc.nmbclusters=229376
+kern.ipc.maxsockets=204800
+net.inet.tcp.maxtcptw=163840
+kern.maxfiles=204800
+
+kern.ipc.somaxconn=4096
+#############
+
+Do you want more? Keep reading...
+
+
+
+
 # Freebsd 9
 sysctl kern.ipc.somaxconn=4096    // our case 56384
 
@@ -1551,3 +1585,4 @@ sendmail_msp_queue_enable="NO"
 #
 ##
 ### EOF ###
+
