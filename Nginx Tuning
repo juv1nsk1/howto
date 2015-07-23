@@ -1,0 +1,1553 @@
+# Freebsd 9
+sysctl kern.ipc.somaxconn=4096    // our case 56384
+
+listen  80  backlog=1024;
+rcvbuf=16k sndbuf=16k;
+sysctl kern.ipc.nmbclusters=200000 // 262144
+sysctl kern.ipc.nmbjumbop=100000    //131072
+
+
+In addition to increasing the address space there’s the possibility to increase the limit of the physical memory available for kernel (320Mb by default). Let’s increase it to 1Gb:
+/boot/loader.conf:
+vm.kmem_size=1G
+
+sysctl kern.ipc.nmbclusters=262144
+
+/boot/loader.conf:|
+sysctl net.inet.tcp.tcbhashsize=4096
+
+
+
+Tuning FreeBSD to serve 100-200 thousands of connections
+I’m back finally. There’s the translation of the Igor Sysoev’s report made on the RIT conference. Igor Sysoev is the creator of one of the most used lightweight http servers in Russia and the world – nginx.
+I also use nginx as reverse-proxy and load balancer in my project.
+mbuf clusters
+FreeBSD stores the network data in the mbuf clusters 2Kb each, but only 1500B are used in each cluster (the size of the Ethernet packet)
+mbufs
+For each mbuf cluster there is “mbuf” structure needed, which have 256B in size and used to organize mbuf clusters in chains. There’s possibility to store some additional useful 100B data into the mbuf, but it is not always used.
+
+If server have the RAM of 1Gb or more 25 thousands of mbuf clusters will be created by default but it is not enough in some cases.
+
+When there’s no any free mbuf clusters available FreeBSD enters the zonelimit state and stops to answer to any network requests. You can see it as the `zoneli` state in the output of the `top` command.
+
+To fix this problem the only solution is to log in through the local console and reboot the system. It is impossible to kill the process in `zoneli` state. This problem is also actual for Linux 2.6.x but even local console will not work in this state for Linux.
+
+There is the patch that fixes the problem, it returns ENOBUFS error, which indicates entering the `zoneli` state and the program may close some connections when receives the error. Unfortunately this patch have not been merged into FreeBSD yet.
+
+The state of used mbuf clusters can be checked by the following command:
+
+> netstat -m
+1/1421/1425 mbufs in use (current/cache/total)
+
+0/614/614/25600 mbufs clusters in use (current/cache/total/max)
+
+You can increase quantity of the mbufs clusters through the kern.ipc.nmbclusters parameter:
+
+> sysctl kern.ipc.nmbclusters=65536
+For earlier versions of FreeBSD mbuf clusters can be configured only in boot time:
+
+/boot/loader.conf:
+
+kern.ipc.mbclusters=65536
+25000 mbuf clusters takes bout a 50Mb in the memory, 32000 – 74Mb, 65000 – 144 Mb (raises by the power of 2). 65000 is the boundary value and I can’t recommend to exceed it without increasing address space of the kernel first.
+
+Increasing the amount of memory available for kernel
+The default space for the kernel in memory is 1Gb for i386 architecture. To set it to 2Gb specify the following line in the kernel configuration file:
+
+options KVA_PAGES=512
+
+On the amd64 the the KVA is always 2Gb and there’s no possibility to increase it yet.
+
+In addition to increasing the address space there’s the possibility to increase the limit of the physical memory available for kernel (320Mb by default). Let’s increase it to 1Gb:
+
+/boot/loader.conf:
+
+vm.kmem_size=1G
+
+And reserve 275Mb for mbuf cluster from that space:
+
+sysctl kern.ipc.nmbclusters=262144
+Establishing the connection. syncache and syncookies
+There’s approximately 100 bytes needed to serve one single connection.
+Approximatelly 100 bytes space is used for single unfinished connection in syncache.
+There’s possibility to store information about 15000 connections in memory. Approximately.
+
+Snyncache parameters can bee seen by “sysctl net.inet.tcp.syncache” command (read-only).
+
+Syncache parameters can be changed only during boot time:
+
+/boot/loader.conf:
+net.inet.tcp.syncache.hashsize=1024
+net.inet.tcp.syncache.bucketlimit=100
+when the new connection does not fit into overfull syncache FreeBSD enters the `syncookies` state (TCP SYN cookies). This possibility is enabled with:
+
+sysctl net.inet.tcp.syncookies=1
+The syncache population and the syncookies stats can be seen with `ntestat -s -p tcp` command.
+
+When the connection is accepted it comes to the “listen socket queue”
+
+Their’s stats can be seen with the `netstat -Lan` command.
+
+Inreasing of the queue is possible with the `sysctl kern.ipc.somaxconn=4096` command
+
+Whan the connection is accepted FreeBSD creates the sockets structures.
+
+To increase the limit of the open sockets:
+
+sysctl kern.ipc.maxsockets=204800
+In earlier versions:
+
+/boot/loader.conf:
+kern.ipc.maxsockets=204800
+The current state can be seen with the following command:
+
+> vmstat -z
+
+tcb hash
+If the server processes several tens of thousands connections the tcb hash allows to detect the target connection for each incoming tcp packet quickly.
+
+The tcb hash is 512 bytes by default.
+
+The current size can be seen with:
+
+sysctl net.inet.tcp.tcbhashsize
+It is changeable in the boot time:
+
+/boot/loader.conf:|
+sysctl net.inet.tcp.tcbhashsize=4096
+Files
+Applicatios are working not with the sockets but with files. And there’s file descriptor needed for each socket because of that. To increase:
+
+sysctl kern.maxfiles=204800
+sysctl kern.maxfilesperproc=200000
+
+These options can be changed on the live system but they will not affect already running processes. nginx have the ability to change the open files limit on the fly:
+
+nginx.conf:
+worker_limit_nofile 200000;
+events {
+worker_connections 200000;
+}
+
+receive buffers
+Buffers for incoming data. 64Kb by default, if there’s no large uploads can be decreased to 8Kb (decreases the probability of overflow during a DDoS attack):
+
+sysctl net.inet.tcp.recvspace=8192
+For nginx:
+
+nginx.conf:
+listen 80 default rcvbuf=8k;
+
+send buffers
+Buffers for outgoing data. 32K by default. If data have a small size usually or there’s a lack of mbuf clusters it may be decreased:
+
+sysctl net.inet.tcp.sendspace=16384
+For nginx:
+
+nginx.conf:
+listen 80 default sendbuf=16k;
+
+In the case when server has written some data to the socket but the client do not want to receive it the data will live in the kernel for several minutes even after the connection will be closed by timeout. Nginx have the option to erase all data after the timeout:
+
+nginx.conf:
+reset_timedout_connections on;
+
+sendfile
+Another way to save some mbuf clusters is the sendfile. It uses the kernel file buffers memory to send the data to the network interface without any intermediate buffers usage.
+
+To enable in nginx:
+
+nginx.conf:
+sendfile on;
+
+(you should explicitly switch it off if you’re sending files from the partition mounted via smbfs or cifs – ReRePi)
+
+On the i386 platform with 1Gb and more memory 6656 sendfile buffers will be allocated which is usually enough. On the amd64 platform more optimal implementation is used and there’s no need in sendbufs at all.
+
+On the sendbuf overflow the process stucks in the `sfbufa` state, but things turns ok after the buffer size is increased:
+
+/boot/loader.conf:
+kern.ipc.nsfbufs=10240
+TIME_WAIT
+After the connection was closed the socket enters the TIME_WAIT state. In this state it can live for 60 seconds by default. This time can be changed with sysctl (in milliseconds divided by 2. 2×30000 MSL = 60 seconds):
+
+sysctl net.inet.tcp.msl=30000
+TCP/IP ports
+Outgoing connection are bind to the ports from the 49152 – 65535 range (16 thousands). It is better to be increased (1024 – 65535):
+
+sysctl net.inet.ip.portrange.first=1024
+sysctl net.inet.ip.portrange.last=65535
+To use ports in natural order instead of random (to make the second connection for the same port impossible before TIME_WAIT):
+
+sysctl net.inet.ip.portrange.randomized=0
+In FreeBSD 6.2 the possibility to not create TIME_WAIT state for localhost connections was added:
+
+sysctl net.inet.tcp.nolocaltimewait=1
+
+# Every socket is a file, so increase them
+kern.maxfiles=204800
+kern.maxfilesperproc=200000
+kern.maxvnodes=200000
+
+# FreeBSD 10.1 -- /boot/loader.conf  version 0.43
+# https://calomel.org/freebsd_network_tuning.html
+#
+# low latency is important so we highly recommend that you disable hyper
+# threading on Intel CPUs as it has an unpredictable affect on latency, cpu
+# cache misses and load. 
+#
+# These settings are specifically tuned for a "low" latency FIOS (300/65) and
+# gigabit LAN connections. If you have 10gig or 40gig you will need to increase
+# the network buffers as proposed.
+#
+
+# ZFS root boot config
+zfs_load="YES"
+vfs.root.mountfrom="zfs:zroot"
+
+# Advanced Host Controller Interface (AHCI) 
+ahci_load="YES"
+
+# Asynchronous I/O, or non-blocking I/O is a form of input/output processing
+# permitting other processing to continue before the transmission has finished.
+# AIO is used for accelerating Nginx on ZFS. Check for our tutorials on both.
+aio_load="YES"
+
+# How many seconds to sit at the boot menu before booting the server. Reduce
+# this value for a faster booting machine. For a server, you may want to
+# increase this time if you have the BIOS auto boot after a power outage or
+# brownout. By increasing the delay you allow more time for the power grid to
+# stabilize and UPS batteries to re-charge. Ideally, you want to avoid the
+# system fast booting into the OS and mounting the file system only to power
+# off because of another brownout. If you are at the console during boot you
+# can always hit enter to bypass this delay. (default 10 seconds)
+#autoboot_delay="120"
+
+# CUBIC Congestion Control allows for more fairness between flows since the
+# window growth is independent of RTT.
+#cc_cubic_load="YES"
+
+# H-TCP Congestion Control for a more aggressive increase in speed on higher
+# latency, high bandwidth networks with some packet loss. 
+cc_htcp_load="YES"
+
+# hostcache cachelimit is the number of ip addresses in the hostcache list.
+# Setting the value to zero(0) stops any ip address connection information from
+# being cached and negates the need for "net.inet.tcp.hostcache.expire". We
+# find disabling the hostcache increases burst data rates by 2x if a subnet was
+# incorrectly graded as slow on a previous connection. A host cache entry is
+# the client's cached tcp connection details and metrics (TTL, SSTRESH and
+# VARTTL) the server can use to improve future performance of connections
+# between the same two hosts. When a tcp connection is completed, our server
+# will cache information about the connection until an expire timeout. If a new
+# connection between the same client is initiated before the cache has expired,
+# the connection will use the cached connection details to setup the
+# connection's internal variables. This pre-cached setup allows the client and
+# server to reach optimal performance significantly faster because the server
+# will not need to go through the usual steps of re-learning the optimal
+# parameters for the connection. To view the current host cache stats use
+# "sysctl net.inet.tcp.hostcache.list" 
+net.inet.tcp.hostcache.cachelimit="0"
+
+# Change the zfs pool output to show the GPT id for each drive instead of the
+# gptid or disk identifier. The gpt id will look like "ada0p2"; the gpt id
+# "ada0" of the first drive found on the AHCI SATA / SAS / SCSI chain and
+# partition string "p2".  Use "gpart list" to see all drive identifiers and
+# "zpool status" to see the chosen id through ZFS.
+kern.geom.label.disk_ident.enable="0"
+kern.geom.label.gpt.enable="1"
+kern.geom.label.gptid.enable="0"
+
+# Intel igb(4): Intel PRO 1000 network chipsets support a maximum of 4096 Rx
+# and 4096 Tx descriptors. FreeBSD defaults to 1024 Rx/Tx descriptors which is
+# lower then necessary. Under high load, an interface could drop packets. To
+# reduce dropped packets use transmit and receive descriptor rings in main
+# memory which point to packet buffers. The igb driver transfers packet data to
+# and from main memory independent of the CPU, using the descriptor rings as
+# lists of packet transmit and receive requests to carry out. Each received
+# packet requires one Receive Descriptor, and each descriptor uses 2 KB of
+# memory. Increase each if your machine or network is saturated or if you have
+# plenty of ram. https://fasterdata.es.net/host-tuning/nic-tuning/
+hw.igb.rxd="4096"  # (default 1024)
+hw.igb.txd="4096"  # (default 1024)
+
+# Intel igb(4): The maximum number of packets to process at Receive End Of
+# Frame (RxEOF). A frame is a data packet on Layer 2 of the OSI mode and "the
+# unit of transmission in a link layer protocol consisting of a link-layer
+# header followed by a packet." "-1" means unlimited. The default of "100" can
+# processes around 500K pps. Test with "netstat -ihw 1" and look at packets
+# received per second.
+# http://bsdrp.net/documentation/examples/forwarding_performance_lab_of_an_ibm_system_x3550_m3_with_intel_82580
+hw.igb.rx_process_limit="-1"  # (default 100)
+
+# Interface Maximum Queue Length: A common recomedation is to set the interface
+# buffer size to the number of packets the interface can transmit (send) in 50
+# milliseconds _OR_ 256 packets times the number of interfaces in the machine,
+# whichever value is greater. An indirect result of increasing the interface
+# queue is the buffer acts like a large TCP initial congestion window
+# (init_cwnd) by allowing a network stack to burst packets at the start of a
+# connection. Do not to set to zero(0) or the network will stop working due to
+# "no network buffers" available. Do not set the interface buffer too large to
+# avoid buffer bloat. To calculate a buffer size for a 60 megabit network take
+# the bandwidth in megabits divided by 8 bits divided by the MTU times 50
+# millisecond times 1000, 60/8/1460*50*1000=256.84 packets in 50 milliseconds.
+# OR, if the box has two(2) interfaces take 256 packets times two(2) NICs to
+# equal 512 packets. We will use 512 since it is the greater of the two values.
+net.link.ifqmaxlen="512"  # (default 50)
+
+###
+######
+######### OFF BELOW HERE #########
+#
+# Other options not used, but included for future reference. We found the
+# following directives did not increase the speed or efficiency of our firewall
+# over the defaults set by the developers. 
+
+# thermal sensors for intel or amd cpus
+#coretemp_load="YES"
+#amdtemp_load="YES"
+
+# accf accept filters are used so the server will not have to context switch several times
+# before performing the initial parsing of the request. This could decrease server load by
+# reducing the amount of CPU time to handle incoming requests.
+
+# Wait for data accept filter. For nginx https servers add "listen
+# 127.0.0.1:443 ssl spdy accept_filter=dataready;"
+#accf_data_load="YES"
+
+# buffer incoming connections until complete HTTP requests arrive (nginx
+# apache) for nginx http add, "listen 127.0.0.1:80 accept_filter=httpready;"
+#accf_http_load="YES"
+
+# Max number of threads for NIC IRQ balancing. Set to the number of real cpu
+# cores in the box. maxthreads will spread the load over multiple cpu cores at
+# the the cost of cpu affinity unbinding. The default of "1" may be faster if
+# the machine is mostly idle.
+#net.isr.maxthreads="4" # (default 1)
+
+# qlimit for igmp, arp, ether and ip6 queues only (netstat -Q) (default 256)
+#net.isr.defaultqlimit="2048" # (default 256)
+
+# enable /dev/crypto for IPSEC of custom seeding using the AES-NI Intel
+# hardware cpu support
+#aesni_load="YES"
+
+# load the Intel PRO/1000 PCI Express kernel module on boot
+#if_igb_load="YES"
+
+# load the Myri10GE kernel module on boot
+#if_mxge_load="YES"
+
+# load the PF CARP module
+#if_carp_load="YES"
+
+# Wait for full DNS request accept filter (unbound)
+#accf_dns_load="YES"
+
+# the following hw.igb.* are for the Intel i350 nic ( igb0, igb1, ect. ) 
+# https://www.myricom.com/software/myri10ge/432-how-do-i-achieve-the-lowest-possible-latency-with-myri10ge.html
+# http://bsdrp.net/documentation/examples/forwarding_performance_lab_of_an_ibm_system_x3550_m3_with_intel_82580
+# http://fasterdata.es.net/network-tuning/router-switch-buffer-size-issues/
+
+# Adaptive interrupt Moderation adjusts the interrupt rate dynamically based on
+# packet size and throughput and reduces system load for igb(4).
+#hw.igb.enable_aim="1"  # (default=1)
+
+# maximum number of interrupts per second generated by single igb(4) (default
+# 8000). FreeBSD 10 supports the new drive which reduces interrupts
+# significantly.
+#hw.igb.max_interrupt_rate="32000"
+
+# number of queues supported on the hardware NIC (default 0); the Intel i350
+# supports up to eight(8) queues. For saturated networks, set to zero(0) to
+# allow the driver to auto tune and create as many queues as real CPU cores up
+# to the NIC's maximum. Make sure to always disable hyperthreading. FreeBSD 10
+# has the new igb(0) driver which significantly reduces the amount of
+# interrupts on the NIC. For lightly loaded networks on FreeBSD 9 and earlier,
+# test setting to one(1) to reduce interrupts, lower latency and increase
+# efficiency. Then check interrupts per second with "vmstat -i" and try to get
+# the counts as low as possible. FreeBSD is most efficient using multiple
+# queues and network threading.
+#hw.igb.num_queues="0"
+
+# MSI-X interrupts for PCI-E 3.0 devices permitting a device to allocate up to
+# 2048 interrupts. MSI-X allows a larger number of interrupts and gives each
+# one a separate target address and data word. Verify MSI-X is being used by
+# the NIC using "dmesg | grep -i msi" with the output looking similar to,
+# "igb0: Using MSIX interrupts with 5 vectors" for an Intel i350.
+#hw.igb.enable_msix="1"  # (default 1)
+
+# higher HZ settings have a negative impact on machine performance due to
+# handling more timer interrupts resulting in more context switches and cache
+# flushes (default 1000).  Lower HZ settings can have a detrimental effect on
+# ZFS.
+# http://lists.freebsd.org/pipermail/freebsd-questions/2005-April/083482.html
+# Also take a look into kern.sched.interact and kern.sched.slice in
+# /etc/sysctl.conf
+#kern.hz=1000
+
+# increase the number of network mbufs the system is willing to allocate.  Each
+# cluster represents approximately 2K of memory, so a value of 524288
+# represents 1GB of kernel memory reserved for network buffers. (default
+# 492680)
+#kern.ipc.nmbclusters="492680"
+#kern.ipc.nmbjumbop="246339"
+
+# maximum number of interrupts per second on any interrupt level (vmstat -i for
+# total rate). If you still see Interrupt Storm detected messages, increase the
+# limit to a higher number and look for the culprit.  For 10gig NIC's set to
+# 9000 and use large MTU. (default 1000)
+#hw.intr_storm_threshold="9000"
+
+# Size of the syncache hash table, must be a power of 2 (default 512)
+#net.inet.tcp.syncache.hashsize="1024"
+
+# Limit the number of entries permitted in each bucket of the hash table. (default 30)
+#net.inet.tcp.syncache.bucketlimit="100"
+
+# number of hash table buckets to handle incoming tcp connections. a value of
+# 65536 allows the system to handle millions incoming connections. each tcp
+# entry in the hash table on x86_64 uses 252 bytes of ram.  vmstat -z | egrep
+# "ITEM|tcpcb" (default 65536 which is ~16M connections)
+#net.inet.tcp.tcbhashsize="65536"
+
+# when booting, display the ascii art FreeBSD Orb with the two horns on top.
+# Just a cosmetic preference over "beastie", the multicolored daemon with
+# pitchfork and over sized shoes.
+#loader_logo="orb"
+
+######################################### net.isr. tuning begin ##############
+# NOTE regarding "net.isr.*" : Processor affinity can effectively reduce cache
+# problems but it does not curb the persistent load-balancing problem.[1]
+# Processor affinity becomes more complicated in systems with non-uniform
+# architectures. A system with two dual-core hyper-threaded CPUs presents a
+# challenge to a scheduling algorithm. There is complete affinity between two
+# virtual CPUs implemented on the same core via hyper-threading, partial
+# affinity between two cores on the same physical chip (as the cores share
+# some, but not all, cache), and no affinity between separate physical chips.
+# It is possible that net.isr.bindthreads="0" and net.isr.maxthreads="3" can
+# cause more slowdown if your system is not cpu loaded already. We highly
+# recommend getting a more efficient network card instead of setting the
+# "net.isr.*" options. Look at the Intel i350 for gigabit or the Myricom
+# 10G-PCIE2-8C2-2S for 10gig. These cards will reduce the machines nic
+# processing to 12% or lower.
+
+# For high bandwidth systems setting bindthreads to "0" will spread the
+# network processing load over multiple cpus allowing the system to handle more
+# throughput. The default is faster for most lightly loaded systems (default 0)
+#net.isr.bindthreads="0"
+
+# qlimit for igmp, arp, ether and ip6 queues only (netstat -Q) (default 256)
+#net.isr.defaultqlimit="256"
+
+# interrupt handling via multiple CPU (default direct)
+#net.isr.dispatch="direct"
+
+# limit per-workstream queues (use "netstat -Q" if Qdrop is greater then 0
+# increase this directive) (default 10240)
+#net.isr.maxqlimit="10240"
+
+# Max number of threads for NIC IRQ balancing 3 for 4 cores in box leaving at
+# least (default 1) one core for system or service processing. Again, if you
+# notice one cpu being overloaded due to network processing this directive will
+# spread out the load at the cost of cpu affinity unbinding. The default of "1"
+# is faster if a single core is not already overloaded.
+#net.isr.maxthreads="1"
+
+############################################ zfs tuning begin ##############
+# martin_matuska_eurobsdcon_2012 = http://www.youtube.com/watch?v=PIpI7Ub6yjo
+#
+# The goal is to keep as much data in RAM before committing to maximize long,
+# concurrent writes and reduce data fragmentation. This machine has eight(8)
+# gigabytes of RAM with zfs mirrored 4 TB drives.
+
+# Dynamically adjust max write limit based on previous txg commits to attempt
+# to maintain a 3-second commit time. If the SATA based mirrored pool can write
+# at 120 MB/sec then the goal is to keep at least (120 MB/sec times 3 seconds
+# equals) 360 MB of data in the write cache to be written to the pool all at
+# once.
+#vfs.zfs.txg.synctime_ms="3000"  # default 1000
+
+# Commit async writes if the maximum I/O requests pending on each device reach
+# the limit.
+#vfs.zfs.vdev.max_pending="32"  # default 10
+
+# Commit async writes after 120 seconds if the max write limit is not reached.
+# WARNING: in the worst case scenario we could loose all 120 seconds worth of
+# data if the machine is abruptly powered off or looses power.
+#vfs.zfs.txg.timeout="120"  # default 5 seconds
+
+# Increase VDEV read ahead cache size. This reduces scrub times and
+# metadata-intensive tasks for a small cost in RAM. The vdev cache uses a
+# simple FIFO rolling data set.
+#vfs.zfs.vdev.cache.size="64M"
+#vfs.zfs.vdev.cache.max="65536" 
+
+# Default vfs.zfs.write_limit_shift appears to be "3" which on a system
+# with 2GB RAM such as this one results in a write_limit_max of 256MB, which
+# is appropriate, so we're not going to change that here.
+#vfs.zfs.write_limit_shift="3"
+
+############################################# zfs tuning end ###############
+
+# SIFTR (Statistical Information For TCP Research) is a kernel module which
+# logs a range of statistics on active TCP connections to a log file in comma
+# separated format. Only useful for researching tcp flows as it does add some
+# processing load to the system.
+# http://manpages.ubuntu.com/manpages/precise/man4/siftr.4freebsd.html
+#siftr_load="YES"
+
+#
+##
+### EOF ###
+The /etc/sysctl.conf
+
+The /etc/sysctl.conf is the primary optimization file. Everything from congestion control to buffer changes can be found here. Again, each option we changed is fully commented and may also have a link to a research study for more information. Directives which are commented out are not used and included for reference. This is a large file so take some time to look through each option and understand why we made the change from default.
+
+# FreeBSD 10.1 -- /etc/sysctl.conf  version 0.43
+# https://calomel.org/freebsd_network_tuning.html
+#
+# low latency is important so we highly recommend that you disable hyper
+# threading on Intel CPUs as it has an unpredictable affect on latency, cpu
+# cache misses and load.
+#
+# These settings are specifically tuned for a "low" latency FIOS (300/300) and
+# gigabit LAN connections. If you have 10gig or 40gig you will need to increase
+# the network buffers as proposed. "man tuning" for more information.
+#
+# Before tuning the following two(2) sections on maxsockbuf and buf_max take 
+# some time to read PSC's tips on Enabling High Performance Data Transfers.
+# http://www.psc.edu/index.php/networking/641-tcp-tune
+
+
+# A standard guide to the socket buffer size is: latency to the host times
+# bandwidth in megabits per second divided by 8 bits = socket buffer size. For
+# a 150 megabit network which pings 0.1 seconds from our server we calculate
+# 0.1 seconds * 150 Mbps / 8 bits = 1.875 megabyte buffer which is below the
+# default of 2MB (2097152). If the host is farther away then the latency will
+# be higher and the buffer will need to be larger. You may want to increase to
+# 4MB if the upload bandwidth is greater the 150 Mbit and latency is over
+# 200ms. For 10GE hosts set to at least 16MB as well as to increase the TCP
+# window size to 65535 and window scale to 9. For 10GE hosts with RTT over
+# 100ms you will need to set a buffer of 150MB and a wscale of 12. "2097152 =
+# 2*1024*1024".
+
+# network:   1 Gbit   maxsockbuf:    2MB   wsize:  6    2^6*65KB =    4MB (default)
+# network:   2 Gbit   maxsockbuf:    4MB   wsize:  7    2^7*65KB =    8MB
+# network:  10 Gbit   maxsockbuf:   16MB   wsize:  9    2^9*65KB =   32MB
+# network:  40 Gbit   maxsockbuf:  150MB   wsize: 12   2^12*65KB =  260MB
+# network: 100 Gbit   maxsockbuf:  600MB   wsize: 14   2^14*65KB = 1064MB
+#kern.ipc.maxsockbuf=4194304 # (default 2097152)
+#kern.ipc.maxsockbuf=16777216 # (default 2097152)
+
+# set auto tuning maximums to the same value as the kern.ipc.maxsockbuf above.
+# Use at least 16MB for 10GE hosts with RTT of less then 100ms. For 10GE hosts
+# with RTT of greater then 100ms set buf_max to 150MB.
+#net.inet.tcp.sendbuf_max=4194304  # (default 2097152)
+#net.inet.tcp.recvbuf_max=4194304  # (default 2097152)
+#net.inet.tcp.sendbuf_max=16777216  # (default 2097152)
+#net.inet.tcp.recvbuf_max=16777216  # (default 2097152)
+
+# maximum segment size (MSS) specifies the largest payload of data in a single
+# TCP segment not including TCP headers or options. mssdflt is also called MSS
+# clamping. With an interface MTU of 1500 bytes we suggest an
+# net.inet.tcp.mssdflt of 1460 bytes. 1500 MTU minus 20 byte IP header minus 20
+# byte TCP header is 1460. With net.inet.tcp.rfc1323 enabled, tcp timestamps
+# are added to the packets and the mss is automatically reduced from 1460 bytes
+# to 1448 bytes total payload. Note: if you are using PF with an outgoing scrub
+# rule then PF will re-package the data using an MTU of 1460 by default, thus
+# overriding this mssdflt setting and Pf scrub might slow down the network.
+# http://www.wand.net.nz/sites/default/files/mss_ict11.pdf 
+net.inet.tcp.mssdflt=1460  # (default 536)
+
+# minimum, maximum segment size (mMSS) specifies the smallest payload of data
+# in a single TCP segment our system will agree to send when negotiating with
+# the client. By default, FreeBSD limits the maximum segment size to no lower
+# then 216 bytes. RFC 791 defines the minimum IP packet size as 68 bytes, but
+# in RFC 793 the minimum MSS is specified to be 536 bytes which is the same
+# value Windows Vista uses.  The attack vector is when a malicious client sets
+# the negotiated MSS to a small value this may cause a packet flood DoS attack
+# from our server. The attack scales with the available bandwidth and quickly
+# saturates the CPU and network interface with packet generation and
+# transmission.  By default, if the client asks for a one(1) megabyte file with
+# an MSS of 216 we have to send back 4,630 packets. If the minimum MSS is set
+# to 1300 we send back only 769 packets which is six times more efficient. For
+# standard Internet connections we suggest a minimum mss of 1300 bytes. 1300
+# will even work on networks making a VOIP (RTP) call using a TCP connection with
+# TCP options over IPSEC though a GRE tunnel on a mobile cellular network with
+# the DF (don't fragment) bit set. 
+net.inet.tcp.minmss=1300   # (default 216)
+
+# H-TCP congestion control: The Hamilton TCP (HighSpeed-TCP) algorithm is a
+# packet loss based congestion control and is more aggressive pushing up to max
+# bandwidth (total BDP) and favors hosts with lower TTL / VARTTL then the
+# default "newreno". Understand "newreno" works well in most conditions and
+# enabling HTCP may only gain a you few percentage points of throughput.
+# http://www.sigcomm.org/sites/default/files/ccr/papers/2008/July/1384609-1384613.pdf
+# make sure to also add 'cc_htcp_load="YES"' to /boot/loader.conf then check
+# available congestion control options with "sysctl net.inet.tcp.cc.available"
+net.inet.tcp.cc.algorithm=htcp  # (default newreno)
+
+# H-TCP congestion control: adaptive back off will increase bandwidth
+# utilization by adjusting the additive-increase/multiplicative-decrease (AIMD)
+# backoff parameter according to the amount of buffers available on the path.
+# adaptive backoff ensures no queue along the path will remain completely empty
+# after a packet loss event which increases buffer efficiency.
+net.inet.tcp.cc.htcp.adaptive_backoff=1 # (default 0 ; disabled)
+
+# H-TCP congestion control: RTT scaling will increase the fairness between
+# competing TCP flows traversing different RTT paths through a common
+# bottleneck. rtt_scaling increases the Congestion Window Size (CWND)
+# independent of path round-trip time (RTT) leading to lower latency for
+# interactive sessions when the connection is saturated by bulk data
+# transfers. Default is 0 (disabled)
+net.inet.tcp.cc.htcp.rtt_scaling=1 # (default 0 ; disabled)
+
+# Ip Forwarding to allow packets to traverse between interfaces and is used for
+# firewalls, bridges and routers. When fast IP forwarding is also enabled, IP packets
+# are forwarded directly to the appropriate network interface with direct
+# processing to completion, which greatly improves the throughput. All packets
+# for local IP addresses, non-unicast, or with IP options are handled by the
+# normal IP input processing path. All features of the normal (slow) IP
+# forwarding path are supported by fast forwarding including firewall (through
+# pfil(9) hooks) checking, except ipsec tunnel brokering. The IP fast
+# forwarding path does not generate ICMP redirect or source quench messages
+# though. Compared to normal IP forwarding, fast forwarding can give a speedup
+# of 40 to 60% in packet forwarding performance which is great for interactive
+# connections like online games or VOIP where low latency is critical.
+net.inet.ip.forwarding=1      # (default 0)
+net.inet.ip.fastforwarding=1  # (default 0)
+
+# somaxconn is the OS buffer, backlog queue depth for accepting new TCP
+# connections. Your application will have its own separate max queue length
+# (maxqlen) which can be checked with "netstat -Lan". The default is 128
+# connections per application thread. Lets say your Nginx web server normally
+# receives 100 connections/sec and is single threaded application. If clients
+# are bursting in at a total of 250 connections/sec you may want to set the
+# somaxconn at 512 to be a 512 deep connection buffer so the extra 122 clients
+# (250-128=122) do not get denied service since you would have 412
+# (512-100=412) extra queue slots. Also, a large listen queue will do a better
+# job of avoiding Denial of Service (DoS) attacks if, and only if, your
+# application can handle the TCP load at the cost of more RAM and CPU time.
+# Nginx sets is backlog queue to the same as the OS somaxconn by default.
+# Note: "kern.ipc.somaxconn" is not shown in "sysctl -a" output, but searching
+# for "kern.ipc.soacceptqueue" gives the same value and both directives stand
+# for the same buffer value.
+kern.ipc.soacceptqueue=1024  # (default 128 ; same as kern.ipc.somaxconn)
+
+# Reduce the amount of SYN/ACKs the server will re-transmit to an ip address
+# whom did not respond to the first SYN/ACK. On a client's initial connection
+# our server will always send a SYN/ACK in response to the client's initial
+# SYN. Limiting retranstited SYN/ACKS reduces local syn cache size and a "SYN
+# flood" DoS attack's collateral damage by not sending SYN/ACKs back to spoofed
+# ips, multiple times. If we do continue to send SYN/ACKs to spoofed IPs they
+# may send RST's back to us and an "amplification" attack would begin against
+# our host. If you do not wish to send retransmits at all then set to zero(0)
+# especially if you are under a SYN attack. If our first SYN/ACK gets dropped
+# the client will re-send another SYN if they still want to connect. Also set
+# "net.inet.tcp.msl" to two(2) times the average round trip time of a client,
+# but no lower then 2000ms (2s). Test with "netstat -s -p tcp" and look under
+# syncache entries.
+# http://people.freebsd.org/~jlemon/papers/syncache.pdf
+# http://www.ouah.org/spank.txt
+net.inet.tcp.syncache.rexmtlimit=0  # (default 3)
+
+# Spoofed packet attacks may be used to overload the kernel route cache. A
+# spoofed packet attack uses random source IPs to cause the kernel to generate
+# a temporary cached route in the route table, Route cache is an extraneous
+# caching layer mapping interfaces to routes to IPs and saves a lookup to the
+# Forward Information Base (FIB); a routing table within the network stack. The
+# IPv4 routing cache was intended to eliminate a FIB lookup and increase
+# performance. While a good idea in principle, unfortunately it provided a very
+# small performance boost in less than 10% of connections and opens up the
+# possibility of a DoS vector. Setting rtexpire and rtminexpire to ten(10)
+# seconds should be sufficient to protect the route table from attack.
+# http://www.es.freebsd.org/doc/handbook/securing-freebsd.html
+net.inet.ip.rtexpire=10      # (default 3600)
+#net.inet.ip.rtminexpire=10  # (default 10  )
+#net.inet.ip.rtmaxcache=128  # (default 128 )
+
+# Syncookies have a certain number of advantages and disadvantages. Syncookies
+# are useful if you are being DoS attacked as this method helps filter the
+# proper clients from the attack machines. But, since the TCP options from the
+# initial SYN are not saved in syncookies, the tcp options are not applied to
+# the connection, precluding use of features like window scale, timestamps, or
+# exact MSS sizing. As the returning ACK establishes the connection, it may be
+# possible for an attacker to ACK flood a machine in an attempt to create a
+# connection. Another benefit to overflowing to the point of getting a valid
+# SYN cookie is the attacker can include data payload. Now that the attacker
+# can send data to a FreeBSD network daemon, even using a spoofed source IP
+# address, they can have FreeBSD do processing on the data which is not
+# something the attacker could do without having SYN cookies. Even though
+# syncookies are helpful during a DoS, we are going to disable them at this
+# time.
+net.inet.tcp.syncookies=0  # (default 1)
+
+# TCP segmentation offload (TSO), also called large segment offload (LSO),
+# should be disabled on NAT firewalls and routers. TSO/LSO works by queuing up
+# large buffers and letting the network interface card (NIC) split them into
+# separate packets. The problem is the NIC can build a packet that is the wrong
+# size and would be dropped by a switch or the receiving machine, like for NFS
+# fragmented traffic. If the packet is dropped the overall sending bandwidth is
+# reduced significantly. You can also disable TSO in /etc/rc.conf using the
+# "-tso" directive after the network card configuration; for example,
+# ifconfig_igb0="inet 10.10.10.1 netmask 255.255.255.0 -tso". Verify TSO is off
+# on the hardware by making sure TSO4 and TSO6 are not seen in the "options="
+# section using ifconfig.
+# http://www.peerwisdom.org/2013/04/03/large-send-offload-and-network-performance/
+net.inet.tcp.tso=0   # (default 1)
+
+# Flow control stops and resumes the transmission of network traffic between
+# two connected peer nodes on a full-duplex Ethernet physical link. Ethernet
+# "PAUSE" frames pause transmission of all traffic on a physical Ethernet link.
+# Some ISP's abuse flow control to slow down customers' traffic even though
+# full bandwidth is not being used. By disabling physical link flow control the
+# link instead relies on TCP's internal flow control which is peer based on IP
+# address. The values are: (0=No Flow Control) (1=Receive Pause) (2=Transmit
+# Pause) (3=Full Flow Control, Default). We will be disabling flow control on
+# the igb interfaces.
+# http://virtualthreads.blogspot.com/2006/02/beware-ethernet-flow-control.html
+dev.igb.0.fc=0  # (default 3)
+
+# General Security and DoS mitigation
+#net.bpf.optimize_writers=0           # bpf are write-only unless program explicitly specifies the read filter (default 0)
+#net.bpf.zerocopy_enable=0            # zero-copy BPF buffers, breaks dhcpd ! (default 0)
+net.inet.ip.check_interface=1         # verify packet arrives on correct interface (default 0)
+#net.inet.ip.portrange.randomized=1   # randomize outgoing upper ports (default 1)
+net.inet.ip.process_options=0         # ignore IP options in the incoming packets (default 1)
+net.inet.ip.random_id=1               # assign a random IP_ID to each packet leaving the system (default 0)
+net.inet.ip.redirect=0                # do not send IP redirects (default 1)
+#net.inet.ip.accept_sourceroute=0     # drop source routed packets since they can not be trusted (default 0)
+#net.inet.ip.sourceroute=0            # if source routed packets are accepted the route data is ignored (default 0)
+#net.inet.ip.stealth=1                # do not reduce the TTL by one(1) when a packets goes through the firewall (default 0)
+#net.inet.icmp.bmcastecho=0           # do not respond to ICMP packets sent to IP broadcast addresses (default 0)
+#net.inet.icmp.maskfake=0             # do not fake reply to ICMP Address Mask Request packets (default 0)
+#net.inet.icmp.maskrepl=0             # replies are not sent for ICMP address mask requests (default 0)
+#net.inet.icmp.log_redirect=0         # do not log redirected ICMP packet attempts (default 0)
+net.inet.icmp.drop_redirect=1         # no redirected ICMP packets (default 0)
+#net.inet.icmp.icmplim=200            # number of ICMP/TCP RST packets/sec, increase for bittorrent or many clients. (default 200)
+#net.inet.icmp.icmplim_output=1       # show "Limiting open port RST response" messages (default 1)
+net.inet.tcp.always_keepalive=0       # disable tcp keep alive detection for dead peers, can be spoofed (default 1)
+net.inet.tcp.drop_synfin=1            # SYN/FIN packets get dropped on initial connection (default 0)
+#net.inet.tcp.ecn.enable=0            # explicit congestion notification (ecn) warning: some ISP routers abuse ECN (default 0)
+net.inet.tcp.fast_finwait2_recycle=1  # recycle FIN/WAIT states quickly (helps against DoS, but may cause false RST) (default 0)
+net.inet.tcp.icmp_may_rst=0           # icmp may not send RST to avoid spoofed icmp/udp floods (default 1)
+#net.inet.tcp.maxtcptw=50000          # max number of tcp time_wait states for closing connections (default ~27767)
+net.inet.tcp.msl=5000                 # Maximum Segment Lifetime is the time a TCP segment can exist on the network and is
+                                      # used to determine the TIME_WAIT interval, 2*MSL (default 30000 which is 60 seconds)
+net.inet.tcp.path_mtu_discovery=0     # disable MTU discovery since most ICMP type 3 packets are dropped by others (default 1)
+#net.inet.tcp.rfc3042=1               # on packet loss trigger the fast retransmit algorithm instead of tcp timeout (default 1)
+net.inet.udp.blackhole=1              # drop udp packets destined for closed sockets (default 0)
+net.inet.tcp.blackhole=2              # drop tcp packets destined for closed ports (default 0)
+#net.route.netisr_maxqlen=256         # route queue length (rtsock using "netstat -Q") (default 256)
+security.bsd.see_other_uids=0         # users only see their own processes. root can see all (default 1)
+vfs.zfs.min_auto_ashift=12            # ZFS 4k alignment
+
+###
+######
+######### OFF BELOW HERE #########
+#
+# Other options not enabled, but included for future reference. The following
+# may be needed in high load environments or against DDOS attacks. Take a look
+# at the detailed comments for more information and make an informed decision.
+
+# The TCP window scale (rfc3390) option is used to increase the TCP receive
+# window size above its maximum value of 65,535 bytes (64k). TCP Time Stamps
+# (rfc1323) allow nearly every segment, including retransmissions, to be
+# accurately timed at negligible computational cost. Both options should be
+# enabled by default.
+#net.inet.tcp.rfc1323=1  # (default 1)
+#net.inet.tcp.rfc3390=1  # (default 1)
+
+# CUBIC congestion control: is a time based congestion control algorithm
+# optimized for high speed, high latency networks and a decent choice for
+# networks with minimal packet loss; most internet connections are in this
+# category. CUBIC can improve startup throughput of bulk data transfers and
+# burst transfers of a web server by up to 2x compared to packet loss based
+# algorithms like newreno and H-TCP. make sure to also add
+# 'cc_cubic_load="YES"' to /boot/loader.conf then check available congestion
+# control options with "sysctl net.inet.tcp.cc.available". If you have a
+# network with greater then one percent packet loss then the next congestion
+# control called H-TCP should be tested.
+#net.inet.tcp.cc.algorithm=cubic  # (default newreno)
+
+# Selective Acknowledgment (SACK) allows the receiver to inform the sender of
+# packets which have been received and if any packets were dropped. The sender
+# can then selectively retransmit the missing data without needing to
+# retransmit entire blocks of data that have already been received
+# successfully. SACK option is not mandatory and support must be negotiated
+# when the connection is established using TCP header options. An attacker
+# downloading large files can abuse SACK by asking for many random segments to
+# be retransmitted. The server in response wastes system resources trying to
+# fulfill superfluous requests. If you are serving small files to low latency
+# clients then SACK can be disabled. If you see issues of flows randomly
+# pausing, try disabling SACK to see if there is equipment in the path which
+# does not handle SACK correctly.
+#net.inet.tcp.sack.enable=1  # (default 1)
+
+# Intel PRO 1000 network cards maximum receive packet processing limit. Make
+# sure to enable hw.igb.rxd and hw.igb.txd in /boot/loader.conf as well.
+# https://fasterdata.es.net/host-tuning/nic-tuning/
+#hw.igb.rx_process_limit="4096" # (default 100)
+#dev.igb.0.rx_processing_limit="4096"  # (default 100)
+#dev.igb.1.rx_processing_limit="4096"  # (default 100)
+#dev.em.0.rx_processing_limit="4096"   # (default 100)
+#dev.em.1.rx_processing_limit="4096"   # (default 100)
+
+# SlowStart Flightsize is TCP's initial congestion window as the number of
+# packets on the wire at the start of the connection or after congestion.
+# Google recommends ten(10), so an MTU of 1460 bytes times ten(10) initial
+# congestion window is a 14.6 kilobytes. If you are running FreeBSD 9.1 or
+# earlier we recommend testing with a value of 44. A window of 44 packets of
+# 1460 bytes easily fits into a client's 64 kilobyte receive buffer space.
+# Note, slowstart_flightsize was removed from FreeBSD 9.2 and now we can only
+# set the initial congestion window to 10.
+# http://www.igvita.com/2011/10/20/faster-web-vs-tcp-slow-start/ 
+#net.inet.tcp.experimental.initcwnd10=1       # (default 1 for FreeBSD 10.1)
+#net.inet.tcp.experimental.initcwnd10=1       # (default 0 for FreeBSD  9.2)
+#net.inet.tcp.local_slowstart_flightsize=44   # (default 4 for FreeBSD  9.1)
+#net.inet.tcp.slowstart_flightsize=44         # (default 4 for FreeBSD  9.1)
+
+# control the amount of send and receive buffer space allowed for any given TCP
+# connection. The default sending buffer is 32K; the default receiving buffer
+# is 64K. You can often improve bandwidth utilization by increasing the
+# default at the cost of eating up more kernel memory for each connec- tion.
+# We do not recommend increasing the defaults if you are serving hundreds or
+# thousands of simultaneous connections because it is possible to quickly run
+# the system out of memory
+#net.inet.tcp.sendspace=262144  # (default 32768)
+#net.inet.tcp.recvspace=262144  # (default 65536)
+
+# Increase auto-tuning TCP step size of the TCP transmit and receive buffers
+# for multi-gigabit networks. The buffer starts at "net.inet.tcp.sendspace"
+# and "net.inet.tcp.recvspace" and increases by these increments up to
+# "net.inet.tcp.recvbuf_max" and "net.inet.tcp.sendbuf_max" as auto tuned by
+# FreeBSD.  http://fasterdata.es.net/host-tuning/freebsd/ 
+#net.inet.tcp.sendbuf_inc=32768  # (default 8192 )
+#net.inet.tcp.recvbuf_inc=65536  # (default 16384)
+
+# host cache is the client's cached tcp connection details and metrics (TTL,
+# SSTRESH and VARTTL) the server can use to improve future performance of
+# connections between the same two hosts. When a tcp connection is completed,
+# our server will cache information about the connection until an expire
+# timeout. If a new connection between the same client is initiated before the
+# cache has expired, the connection will use the cached connection details to
+# setup the connection's internal variables. This pre-cached setup allows the
+# client and server to reach optimal performance significantly faster because
+# the server will not need to go through the usual steps of re-learning the
+# optimal parameters for the connection. Unfortunately, this can also make
+# performance worse because the hostcache will apply the exception case to
+# every new connection from a client within the expire time. In other words, in
+# some cases, one person surfing your site from a mobile phone who has some
+# random packet loss can reduce your server's performance to this visitor even
+# when their temporary loss has cleared.  3900 seconds allows clients who
+# connect regularly to stay in our hostcache. To view the current host cache
+# stats use "sysctl net.inet.tcp.hostcache.list" . If you have
+# "net.inet.tcp.hostcache.cachelimit=0" like in our /boot/loader.conf example
+# then this expire time is negated and not uesd.
+#net.inet.tcp.hostcache.expire=3900  # (default 3600)
+
+# By default, acks are delayed by 100 ms or sent every other packet in order to
+# improve the chance of being added to another returned data packet which is
+# full. This method can cut the number of tiny packets flowing across the
+# network and is efficient. But, delayed ACKs cause issues on modern, short
+# hop, low latency networks. TCP works by increasing the congestion window,
+# which is the amount of data currently traveling on the wire, based on the
+# number of ACKs received per time frame. Delaying the timing of the ACKs
+# received results in less data on the wire, time in TCP slowstart is doubled
+# and in congestion avoidance after packet loss the congestion window growth is
+# slowed.  Setting delacktime higher then 100 will to slow downloads as ACKs
+# are queued too long. On low latency 10gig links we find a value of 20ms is
+# optimal. http://www.tel.uva.es/personales/ignmig/pdfs/ogonzalez_NOC05.pdf
+#net.inet.tcp.delayed_ack=1   # (default 1)
+#net.inet.tcp.delacktime=20   # (default 100)
+
+# Do not create a socket or compressed tcpw for TCP connections restricted to
+# the local machine connecting to itself on localhost. An example connection
+# would be a web server and a database server running on the same machine or
+# freebsd jails connecting to each other. 
+#net.inet.tcp.nolocaltimewait=1  # (default 0)
+
+# maximum incoming and outgoing ip4 network queue sizes. (netstat -Q) Increase
+# if queue_drops is greater then zero(0).
+#net.inet.ip.intr_queue_maxlen=2048
+#net.route.netisr_maxqlen=2048
+
+# security settings for jailed environments. it is generally a good idea to
+# separately jail any service which is accessible by an external client like
+# the web or mail server. This is especially true for public facing services.
+# take a look at ezjail, http://forums.freebsd.org/showthread.php?t=16860
+#security.jail.allow_raw_sockets=1       # (default 0)
+#security.jail.enforce_statfs=2          # (default 2)
+#security.jail.set_hostname_allowed=0    # (default 1)
+#security.jail.socket_unixiproute_only=1 # (default 1)
+#security.jail.sysvipc_allowed=0         # (default 0)
+#security.jail.chflags_allowed=0         # (default 0)
+
+# decrease the scheduler maximum time slice for lower latency program calls.
+# by default we use stathz/10 which equals thirteen(13). also, decrease the
+# scheduler maximum time for interactive programs as this is a dedicated
+# server (default 30). Also make sure you look into "kern.hz=100" in /boot/loader.conf
+#kern.sched.interact=5 # (default 30)
+#kern.sched.slice=3    # (default 12)
+
+# increase localhost network buffers. For example, if you run many high
+# bandwidth services on lo0 like an http or local DB server and forward public
+# external traffic using Pf. Also, if running many jails on lo0 then these may
+# help. set to 10x(lo0 mtu 16384 + 40 bytes for header) = 164240
+#net.local.stream.sendspace=164240  # (default 8192)
+#net.local.stream.recvspace=164240  # (default 8192)
+
+# threads per process
+#kern.threads.max_threads_per_proc=9000
+
+# create core dump file on "exited on signal 6"
+#kern.coredump=1             # (default 1)
+#kern.sugid_coredump=1        # (default 0)
+#kern.corefile="/tmp/%N.core" # (default %N.core)
+
+# ZFS L2ARC tuning - If you have read intensive workloads and limited RAM make
+# sure to use an SSD for your L2ARC. Verify noprefetch is enabled(1) and
+# increase the speed at which the system can fill the L2ARC device. By default,
+# when the L2ARC is being populated FreeBSD will only write at 16MB/sec to the
+# SSD. 16MB calculated by adding the speed of write_boost and write_max.
+# 16MB/sec is too slow as many SSD's made today which can easily sustain
+# 500MB/sec. It is recommend to set both write_boost and write_max to at least
+# 256MB each so the L2ARC can be quickly seeded. Contrary to myth, enterprise
+# class SSDs can last for many years under constant read/write abuse of a web
+# server.
+#vfs.zfs.l2arc_noprefetch=1          # (default 1)
+#vfs.zfs.l2arc_write_boost=268435456 # (default 8388608)
+#vfs.zfs.l2arc_write_max=268435456   # (default 8388608)
+
+# ZFS - Set TXG write limit to a lower threshold. This helps "level out" the
+# throughput rate (see "zpool iostat").  A value of 256MB works well for
+# systems with 4 GB of RAM, while 1 GB works well for us w/ 8 GB on disks which
+# have 64 MB cache.
+#vfs.zfs.write_limit_override=1073741824
+
+# For slow drives, set outstanding vdev I/O to "1" to prevent parallel
+# reads/writes per zfs vdev. By limiting read write streams we effectually force
+# drive access into long sequential disk access for drives like a single
+# 5400rpm disk. A value of one is not good for multiple disk spindles.
+#vfs.zfs.vdev.min_pending="1"
+#vfs.zfs.vdev.max_pending="1"
+
+# TCP keep alive can help detecting network errors and signaling connection
+# problems. Keep alives will increase signaling bandwidth used, but as
+# bandwidth utilized by signaling channels is low from its nature, the increase
+# is insignificant. the system will disconnect a dead TCP connection when the
+# remote peer is dead or unresponsive for: 10000 + (5000 x 8) = 50000 msec (50
+# sec)
+#net.inet.tcp.keepidle=10000     # (default 7200000 )
+#net.inet.tcp.keepintvl=5000     # (default 75000 )
+#net.inet.tcp.always_keepalive=1 # (default 1)
+
+
+# UFS hard drive read ahead equivalent to 4 MiB at 32KiB block size. Easily
+# increases read speeds from 60 MB/sec to 80 MB/sec on a single spinning hard
+# drive. Samsung 830 SSD drives went from 310 MB/sec to 372 MB/sec (SATA 6).
+# use Bonnie++ to performance test file system I/O
+#vfs.read_max=128
+
+# global limit for number of sockets in the system. If kern.ipc.numopensockets
+# plus net.inet.tcp.maxtcptw is close to kern.ipc.maxsockets then increase this
+# value
+#kern.ipc.maxsockets = 25600
+
+# spread tcp timer callout load evenly across cpus. We did not see any speed
+# benefit from enabling per cpu timers. The default is off(0)
+#net.inet.tcp.per_cpu_timers = 0
+
+# Increase maxdgram length for jumbo frames (9000 mtu) OSPF routing. Safe for
+# 1500 mtu too.
+#net.inet.raw.maxdgram=9216
+#net.inet.raw.recvspace=9216 
+
+# seeding cryptographic random number generators is provided by the /dev/random
+# device, which provides psudo "real" randomness. The arc4random(3) library call
+# provides a pseudo-random sequence which is generally reckoned to be suitable
+# for simple cryptographic use. The OpenSSL library also provides functions for
+# managing randomness via functions such as RAND_bytes(3) and RAND_add(3). Note
+# that OpenSSL uses the random device /dev/random for seeding automatically.
+# http://manpages.ubuntu.com/manpages/lucid/man4/random.4freebsd.html
+#kern.random.yarrow.gengateinterval=10  # default 10 [4..64]
+#kern.random.yarrow.bins=10             # default 10 [2..16]
+#kern.random.yarrow.fastthresh=192      # default 192 [64..256]
+#kern.random.yarrow.slowthresh=256      # default 256 [64..256]
+#kern.random.yarrow.slowoverthresh=2    # default 2 [1..5]
+#kern.random.sys.seeded=1               # default 1
+#kern.random.sys.harvest.ethernet=1     # default 1
+#kern.random.sys.harvest.point_to_point=1 # default 1
+#kern.random.sys.harvest.interrupt=1    # default 1
+#kern.random.sys.harvest.swi=0          # default 0 and actually does nothing when enabled
+
+# IPv6 Security
+# For more info see http://www.fosslc.org/drupal/content/security-implications-ipv6
+# Disable Node info replies
+# To see this vulnerability in action run `ping6 -a sglAac ::1` or `ping6 -w ::1` on unprotected node
+#net.inet6.icmp6.nodeinfo=0
+# Turn on IPv6 privacy extensions
+# For more info see proposal http://unix.derkeiler.com/Mailing-Lists/FreeBSD/net/2008-06/msg00103.html
+#net.inet6.ip6.use_tempaddr=1
+#net.inet6.ip6.prefer_tempaddr=1
+# Disable ICMP redirect
+#net.inet6.icmp6.rediraccept=0
+# Disable acceptation of RA and auto linklocal generation if you don't use them
+##net.inet6.ip6.accept_rtadv=0
+##net.inet6.ip6.auto_linklocal=0
+
+#
+##
+### EOF ###
+
+# FreeBSD 10.1 -- /etc/sysctl.conf  version 0.43
+# https://calomel.org/freebsd_network_tuning.html
+#
+# low latency is important so we highly recommend that you disable hyper
+# threading on Intel CPUs as it has an unpredictable affect on latency, cpu
+# cache misses and load.
+#
+# These settings are specifically tuned for a "low" latency FIOS (300/300) and
+# gigabit LAN connections. If you have 10gig or 40gig you will need to increase
+# the network buffers as proposed. "man tuning" for more information.
+#
+# Before tuning the following two(2) sections on maxsockbuf and buf_max take 
+# some time to read PSC's tips on Enabling High Performance Data Transfers.
+# http://www.psc.edu/index.php/networking/641-tcp-tune
+
+
+# A standard guide to the socket buffer size is: latency to the host times
+# bandwidth in megabits per second divided by 8 bits = socket buffer size. For
+# a 150 megabit network which pings 0.1 seconds from our server we calculate
+# 0.1 seconds * 150 Mbps / 8 bits = 1.875 megabyte buffer which is below the
+# default of 2MB (2097152). If the host is farther away then the latency will
+# be higher and the buffer will need to be larger. You may want to increase to
+# 4MB if the upload bandwidth is greater the 150 Mbit and latency is over
+# 200ms. For 10GE hosts set to at least 16MB as well as to increase the TCP
+# window size to 65535 and window scale to 9. For 10GE hosts with RTT over
+# 100ms you will need to set a buffer of 150MB and a wscale of 12. "2097152 =
+# 2*1024*1024".
+
+# network:   1 Gbit   maxsockbuf:    2MB   wsize:  6    2^6*65KB =    4MB (default)
+# network:   2 Gbit   maxsockbuf:    4MB   wsize:  7    2^7*65KB =    8MB
+# network:  10 Gbit   maxsockbuf:   16MB   wsize:  9    2^9*65KB =   32MB
+# network:  40 Gbit   maxsockbuf:  150MB   wsize: 12   2^12*65KB =  260MB
+# network: 100 Gbit   maxsockbuf:  600MB   wsize: 14   2^14*65KB = 1064MB
+#kern.ipc.maxsockbuf=4194304 # (default 2097152)
+#kern.ipc.maxsockbuf=16777216 # (default 2097152)
+
+# set auto tuning maximums to the same value as the kern.ipc.maxsockbuf above.
+# Use at least 16MB for 10GE hosts with RTT of less then 100ms. For 10GE hosts
+# with RTT of greater then 100ms set buf_max to 150MB.
+#net.inet.tcp.sendbuf_max=4194304  # (default 2097152)
+#net.inet.tcp.recvbuf_max=4194304  # (default 2097152)
+#net.inet.tcp.sendbuf_max=16777216  # (default 2097152)
+#net.inet.tcp.recvbuf_max=16777216  # (default 2097152)
+
+# maximum segment size (MSS) specifies the largest payload of data in a single
+# TCP segment not including TCP headers or options. mssdflt is also called MSS
+# clamping. With an interface MTU of 1500 bytes we suggest an
+# net.inet.tcp.mssdflt of 1460 bytes. 1500 MTU minus 20 byte IP header minus 20
+# byte TCP header is 1460. With net.inet.tcp.rfc1323 enabled, tcp timestamps
+# are added to the packets and the mss is automatically reduced from 1460 bytes
+# to 1448 bytes total payload. Note: if you are using PF with an outgoing scrub
+# rule then PF will re-package the data using an MTU of 1460 by default, thus
+# overriding this mssdflt setting and Pf scrub might slow down the network.
+# http://www.wand.net.nz/sites/default/files/mss_ict11.pdf 
+net.inet.tcp.mssdflt=1460  # (default 536)
+
+# minimum, maximum segment size (mMSS) specifies the smallest payload of data
+# in a single TCP segment our system will agree to send when negotiating with
+# the client. By default, FreeBSD limits the maximum segment size to no lower
+# then 216 bytes. RFC 791 defines the minimum IP packet size as 68 bytes, but
+# in RFC 793 the minimum MSS is specified to be 536 bytes which is the same
+# value Windows Vista uses.  The attack vector is when a malicious client sets
+# the negotiated MSS to a small value this may cause a packet flood DoS attack
+# from our server. The attack scales with the available bandwidth and quickly
+# saturates the CPU and network interface with packet generation and
+# transmission.  By default, if the client asks for a one(1) megabyte file with
+# an MSS of 216 we have to send back 4,630 packets. If the minimum MSS is set
+# to 1300 we send back only 769 packets which is six times more efficient. For
+# standard Internet connections we suggest a minimum mss of 1300 bytes. 1300
+# will even work on networks making a VOIP (RTP) call using a TCP connection with
+# TCP options over IPSEC though a GRE tunnel on a mobile cellular network with
+# the DF (don't fragment) bit set. 
+net.inet.tcp.minmss=1300   # (default 216)
+
+# H-TCP congestion control: The Hamilton TCP (HighSpeed-TCP) algorithm is a
+# packet loss based congestion control and is more aggressive pushing up to max
+# bandwidth (total BDP) and favors hosts with lower TTL / VARTTL then the
+# default "newreno". Understand "newreno" works well in most conditions and
+# enabling HTCP may only gain a you few percentage points of throughput.
+# http://www.sigcomm.org/sites/default/files/ccr/papers/2008/July/1384609-1384613.pdf
+# make sure to also add 'cc_htcp_load="YES"' to /boot/loader.conf then check
+# available congestion control options with "sysctl net.inet.tcp.cc.available"
+net.inet.tcp.cc.algorithm=htcp  # (default newreno)
+
+# H-TCP congestion control: adaptive back off will increase bandwidth
+# utilization by adjusting the additive-increase/multiplicative-decrease (AIMD)
+# backoff parameter according to the amount of buffers available on the path.
+# adaptive backoff ensures no queue along the path will remain completely empty
+# after a packet loss event which increases buffer efficiency.
+net.inet.tcp.cc.htcp.adaptive_backoff=1 # (default 0 ; disabled)
+
+# H-TCP congestion control: RTT scaling will increase the fairness between
+# competing TCP flows traversing different RTT paths through a common
+# bottleneck. rtt_scaling increases the Congestion Window Size (CWND)
+# independent of path round-trip time (RTT) leading to lower latency for
+# interactive sessions when the connection is saturated by bulk data
+# transfers. Default is 0 (disabled)
+net.inet.tcp.cc.htcp.rtt_scaling=1 # (default 0 ; disabled)
+
+# Ip Forwarding to allow packets to traverse between interfaces and is used for
+# firewalls, bridges and routers. When fast IP forwarding is also enabled, IP packets
+# are forwarded directly to the appropriate network interface with direct
+# processing to completion, which greatly improves the throughput. All packets
+# for local IP addresses, non-unicast, or with IP options are handled by the
+# normal IP input processing path. All features of the normal (slow) IP
+# forwarding path are supported by fast forwarding including firewall (through
+# pfil(9) hooks) checking, except ipsec tunnel brokering. The IP fast
+# forwarding path does not generate ICMP redirect or source quench messages
+# though. Compared to normal IP forwarding, fast forwarding can give a speedup
+# of 40 to 60% in packet forwarding performance which is great for interactive
+# connections like online games or VOIP where low latency is critical.
+net.inet.ip.forwarding=1      # (default 0)
+net.inet.ip.fastforwarding=1  # (default 0)
+
+# somaxconn is the OS buffer, backlog queue depth for accepting new TCP
+# connections. Your application will have its own separate max queue length
+# (maxqlen) which can be checked with "netstat -Lan". The default is 128
+# connections per application thread. Lets say your Nginx web server normally
+# receives 100 connections/sec and is single threaded application. If clients
+# are bursting in at a total of 250 connections/sec you may want to set the
+# somaxconn at 512 to be a 512 deep connection buffer so the extra 122 clients
+# (250-128=122) do not get denied service since you would have 412
+# (512-100=412) extra queue slots. Also, a large listen queue will do a better
+# job of avoiding Denial of Service (DoS) attacks if, and only if, your
+# application can handle the TCP load at the cost of more RAM and CPU time.
+# Nginx sets is backlog queue to the same as the OS somaxconn by default.
+# Note: "kern.ipc.somaxconn" is not shown in "sysctl -a" output, but searching
+# for "kern.ipc.soacceptqueue" gives the same value and both directives stand
+# for the same buffer value.
+kern.ipc.soacceptqueue=1024  # (default 128 ; same as kern.ipc.somaxconn)
+
+# Reduce the amount of SYN/ACKs the server will re-transmit to an ip address
+# whom did not respond to the first SYN/ACK. On a client's initial connection
+# our server will always send a SYN/ACK in response to the client's initial
+# SYN. Limiting retranstited SYN/ACKS reduces local syn cache size and a "SYN
+# flood" DoS attack's collateral damage by not sending SYN/ACKs back to spoofed
+# ips, multiple times. If we do continue to send SYN/ACKs to spoofed IPs they
+# may send RST's back to us and an "amplification" attack would begin against
+# our host. If you do not wish to send retransmits at all then set to zero(0)
+# especially if you are under a SYN attack. If our first SYN/ACK gets dropped
+# the client will re-send another SYN if they still want to connect. Also set
+# "net.inet.tcp.msl" to two(2) times the average round trip time of a client,
+# but no lower then 2000ms (2s). Test with "netstat -s -p tcp" and look under
+# syncache entries.
+# http://people.freebsd.org/~jlemon/papers/syncache.pdf
+# http://www.ouah.org/spank.txt
+net.inet.tcp.syncache.rexmtlimit=0  # (default 3)
+
+# Spoofed packet attacks may be used to overload the kernel route cache. A
+# spoofed packet attack uses random source IPs to cause the kernel to generate
+# a temporary cached route in the route table, Route cache is an extraneous
+# caching layer mapping interfaces to routes to IPs and saves a lookup to the
+# Forward Information Base (FIB); a routing table within the network stack. The
+# IPv4 routing cache was intended to eliminate a FIB lookup and increase
+# performance. While a good idea in principle, unfortunately it provided a very
+# small performance boost in less than 10% of connections and opens up the
+# possibility of a DoS vector. Setting rtexpire and rtminexpire to ten(10)
+# seconds should be sufficient to protect the route table from attack.
+# http://www.es.freebsd.org/doc/handbook/securing-freebsd.html
+net.inet.ip.rtexpire=10      # (default 3600)
+#net.inet.ip.rtminexpire=10  # (default 10  )
+#net.inet.ip.rtmaxcache=128  # (default 128 )
+
+# Syncookies have a certain number of advantages and disadvantages. Syncookies
+# are useful if you are being DoS attacked as this method helps filter the
+# proper clients from the attack machines. But, since the TCP options from the
+# initial SYN are not saved in syncookies, the tcp options are not applied to
+# the connection, precluding use of features like window scale, timestamps, or
+# exact MSS sizing. As the returning ACK establishes the connection, it may be
+# possible for an attacker to ACK flood a machine in an attempt to create a
+# connection. Another benefit to overflowing to the point of getting a valid
+# SYN cookie is the attacker can include data payload. Now that the attacker
+# can send data to a FreeBSD network daemon, even using a spoofed source IP
+# address, they can have FreeBSD do processing on the data which is not
+# something the attacker could do without having SYN cookies. Even though
+# syncookies are helpful during a DoS, we are going to disable them at this
+# time.
+net.inet.tcp.syncookies=0  # (default 1)
+
+# TCP segmentation offload (TSO), also called large segment offload (LSO),
+# should be disabled on NAT firewalls and routers. TSO/LSO works by queuing up
+# large buffers and letting the network interface card (NIC) split them into
+# separate packets. The problem is the NIC can build a packet that is the wrong
+# size and would be dropped by a switch or the receiving machine, like for NFS
+# fragmented traffic. If the packet is dropped the overall sending bandwidth is
+# reduced significantly. You can also disable TSO in /etc/rc.conf using the
+# "-tso" directive after the network card configuration; for example,
+# ifconfig_igb0="inet 10.10.10.1 netmask 255.255.255.0 -tso". Verify TSO is off
+# on the hardware by making sure TSO4 and TSO6 are not seen in the "options="
+# section using ifconfig.
+# http://www.peerwisdom.org/2013/04/03/large-send-offload-and-network-performance/
+net.inet.tcp.tso=0   # (default 1)
+
+# Flow control stops and resumes the transmission of network traffic between
+# two connected peer nodes on a full-duplex Ethernet physical link. Ethernet
+# "PAUSE" frames pause transmission of all traffic on a physical Ethernet link.
+# Some ISP's abuse flow control to slow down customers' traffic even though
+# full bandwidth is not being used. By disabling physical link flow control the
+# link instead relies on TCP's internal flow control which is peer based on IP
+# address. The values are: (0=No Flow Control) (1=Receive Pause) (2=Transmit
+# Pause) (3=Full Flow Control, Default). We will be disabling flow control on
+# the igb interfaces.
+# http://virtualthreads.blogspot.com/2006/02/beware-ethernet-flow-control.html
+dev.igb.0.fc=0  # (default 3)
+
+# General Security and DoS mitigation
+#net.bpf.optimize_writers=0           # bpf are write-only unless program explicitly specifies the read filter (default 0)
+#net.bpf.zerocopy_enable=0            # zero-copy BPF buffers, breaks dhcpd ! (default 0)
+net.inet.ip.check_interface=1         # verify packet arrives on correct interface (default 0)
+#net.inet.ip.portrange.randomized=1   # randomize outgoing upper ports (default 1)
+net.inet.ip.process_options=0         # ignore IP options in the incoming packets (default 1)
+net.inet.ip.random_id=1               # assign a random IP_ID to each packet leaving the system (default 0)
+net.inet.ip.redirect=0                # do not send IP redirects (default 1)
+#net.inet.ip.accept_sourceroute=0     # drop source routed packets since they can not be trusted (default 0)
+#net.inet.ip.sourceroute=0            # if source routed packets are accepted the route data is ignored (default 0)
+#net.inet.ip.stealth=1                # do not reduce the TTL by one(1) when a packets goes through the firewall (default 0)
+#net.inet.icmp.bmcastecho=0           # do not respond to ICMP packets sent to IP broadcast addresses (default 0)
+#net.inet.icmp.maskfake=0             # do not fake reply to ICMP Address Mask Request packets (default 0)
+#net.inet.icmp.maskrepl=0             # replies are not sent for ICMP address mask requests (default 0)
+#net.inet.icmp.log_redirect=0         # do not log redirected ICMP packet attempts (default 0)
+net.inet.icmp.drop_redirect=1         # no redirected ICMP packets (default 0)
+#net.inet.icmp.icmplim=200            # number of ICMP/TCP RST packets/sec, increase for bittorrent or many clients. (default 200)
+#net.inet.icmp.icmplim_output=1       # show "Limiting open port RST response" messages (default 1)
+net.inet.tcp.always_keepalive=0       # disable tcp keep alive detection for dead peers, can be spoofed (default 1)
+net.inet.tcp.drop_synfin=1            # SYN/FIN packets get dropped on initial connection (default 0)
+#net.inet.tcp.ecn.enable=0            # explicit congestion notification (ecn) warning: some ISP routers abuse ECN (default 0)
+net.inet.tcp.fast_finwait2_recycle=1  # recycle FIN/WAIT states quickly (helps against DoS, but may cause false RST) (default 0)
+net.inet.tcp.icmp_may_rst=0           # icmp may not send RST to avoid spoofed icmp/udp floods (default 1)
+#net.inet.tcp.maxtcptw=50000          # max number of tcp time_wait states for closing connections (default ~27767)
+net.inet.tcp.msl=5000                 # Maximum Segment Lifetime is the time a TCP segment can exist on the network and is
+                                      # used to determine the TIME_WAIT interval, 2*MSL (default 30000 which is 60 seconds)
+net.inet.tcp.path_mtu_discovery=0     # disable MTU discovery since most ICMP type 3 packets are dropped by others (default 1)
+#net.inet.tcp.rfc3042=1               # on packet loss trigger the fast retransmit algorithm instead of tcp timeout (default 1)
+net.inet.udp.blackhole=1              # drop udp packets destined for closed sockets (default 0)
+net.inet.tcp.blackhole=2              # drop tcp packets destined for closed ports (default 0)
+#net.route.netisr_maxqlen=256         # route queue length (rtsock using "netstat -Q") (default 256)
+security.bsd.see_other_uids=0         # users only see their own processes. root can see all (default 1)
+vfs.zfs.min_auto_ashift=12            # ZFS 4k alignment
+
+###
+######
+######### OFF BELOW HERE #########
+#
+# Other options not enabled, but included for future reference. The following
+# may be needed in high load environments or against DDOS attacks. Take a look
+# at the detailed comments for more information and make an informed decision.
+
+# The TCP window scale (rfc3390) option is used to increase the TCP receive
+# window size above its maximum value of 65,535 bytes (64k). TCP Time Stamps
+# (rfc1323) allow nearly every segment, including retransmissions, to be
+# accurately timed at negligible computational cost. Both options should be
+# enabled by default.
+#net.inet.tcp.rfc1323=1  # (default 1)
+#net.inet.tcp.rfc3390=1  # (default 1)
+
+# CUBIC congestion control: is a time based congestion control algorithm
+# optimized for high speed, high latency networks and a decent choice for
+# networks with minimal packet loss; most internet connections are in this
+# category. CUBIC can improve startup throughput of bulk data transfers and
+# burst transfers of a web server by up to 2x compared to packet loss based
+# algorithms like newreno and H-TCP. make sure to also add
+# 'cc_cubic_load="YES"' to /boot/loader.conf then check available congestion
+# control options with "sysctl net.inet.tcp.cc.available". If you have a
+# network with greater then one percent packet loss then the next congestion
+# control called H-TCP should be tested.
+#net.inet.tcp.cc.algorithm=cubic  # (default newreno)
+
+# Selective Acknowledgment (SACK) allows the receiver to inform the sender of
+# packets which have been received and if any packets were dropped. The sender
+# can then selectively retransmit the missing data without needing to
+# retransmit entire blocks of data that have already been received
+# successfully. SACK option is not mandatory and support must be negotiated
+# when the connection is established using TCP header options. An attacker
+# downloading large files can abuse SACK by asking for many random segments to
+# be retransmitted. The server in response wastes system resources trying to
+# fulfill superfluous requests. If you are serving small files to low latency
+# clients then SACK can be disabled. If you see issues of flows randomly
+# pausing, try disabling SACK to see if there is equipment in the path which
+# does not handle SACK correctly.
+#net.inet.tcp.sack.enable=1  # (default 1)
+
+# Intel PRO 1000 network cards maximum receive packet processing limit. Make
+# sure to enable hw.igb.rxd and hw.igb.txd in /boot/loader.conf as well.
+# https://fasterdata.es.net/host-tuning/nic-tuning/
+#hw.igb.rx_process_limit="4096" # (default 100)
+#dev.igb.0.rx_processing_limit="4096"  # (default 100)
+#dev.igb.1.rx_processing_limit="4096"  # (default 100)
+#dev.em.0.rx_processing_limit="4096"   # (default 100)
+#dev.em.1.rx_processing_limit="4096"   # (default 100)
+
+# SlowStart Flightsize is TCP's initial congestion window as the number of
+# packets on the wire at the start of the connection or after congestion.
+# Google recommends ten(10), so an MTU of 1460 bytes times ten(10) initial
+# congestion window is a 14.6 kilobytes. If you are running FreeBSD 9.1 or
+# earlier we recommend testing with a value of 44. A window of 44 packets of
+# 1460 bytes easily fits into a client's 64 kilobyte receive buffer space.
+# Note, slowstart_flightsize was removed from FreeBSD 9.2 and now we can only
+# set the initial congestion window to 10.
+# http://www.igvita.com/2011/10/20/faster-web-vs-tcp-slow-start/ 
+#net.inet.tcp.experimental.initcwnd10=1       # (default 1 for FreeBSD 10.1)
+#net.inet.tcp.experimental.initcwnd10=1       # (default 0 for FreeBSD  9.2)
+#net.inet.tcp.local_slowstart_flightsize=44   # (default 4 for FreeBSD  9.1)
+#net.inet.tcp.slowstart_flightsize=44         # (default 4 for FreeBSD  9.1)
+
+# control the amount of send and receive buffer space allowed for any given TCP
+# connection. The default sending buffer is 32K; the default receiving buffer
+# is 64K. You can often improve bandwidth utilization by increasing the
+# default at the cost of eating up more kernel memory for each connec- tion.
+# We do not recommend increasing the defaults if you are serving hundreds or
+# thousands of simultaneous connections because it is possible to quickly run
+# the system out of memory
+#net.inet.tcp.sendspace=262144  # (default 32768)
+#net.inet.tcp.recvspace=262144  # (default 65536)
+
+# Increase auto-tuning TCP step size of the TCP transmit and receive buffers
+# for multi-gigabit networks. The buffer starts at "net.inet.tcp.sendspace"
+# and "net.inet.tcp.recvspace" and increases by these increments up to
+# "net.inet.tcp.recvbuf_max" and "net.inet.tcp.sendbuf_max" as auto tuned by
+# FreeBSD.  http://fasterdata.es.net/host-tuning/freebsd/ 
+#net.inet.tcp.sendbuf_inc=32768  # (default 8192 )
+#net.inet.tcp.recvbuf_inc=65536  # (default 16384)
+
+# host cache is the client's cached tcp connection details and metrics (TTL,
+# SSTRESH and VARTTL) the server can use to improve future performance of
+# connections between the same two hosts. When a tcp connection is completed,
+# our server will cache information about the connection until an expire
+# timeout. If a new connection between the same client is initiated before the
+# cache has expired, the connection will use the cached connection details to
+# setup the connection's internal variables. This pre-cached setup allows the
+# client and server to reach optimal performance significantly faster because
+# the server will not need to go through the usual steps of re-learning the
+# optimal parameters for the connection. Unfortunately, this can also make
+# performance worse because the hostcache will apply the exception case to
+# every new connection from a client within the expire time. In other words, in
+# some cases, one person surfing your site from a mobile phone who has some
+# random packet loss can reduce your server's performance to this visitor even
+# when their temporary loss has cleared.  3900 seconds allows clients who
+# connect regularly to stay in our hostcache. To view the current host cache
+# stats use "sysctl net.inet.tcp.hostcache.list" . If you have
+# "net.inet.tcp.hostcache.cachelimit=0" like in our /boot/loader.conf example
+# then this expire time is negated and not uesd.
+#net.inet.tcp.hostcache.expire=3900  # (default 3600)
+
+# By default, acks are delayed by 100 ms or sent every other packet in order to
+# improve the chance of being added to another returned data packet which is
+# full. This method can cut the number of tiny packets flowing across the
+# network and is efficient. But, delayed ACKs cause issues on modern, short
+# hop, low latency networks. TCP works by increasing the congestion window,
+# which is the amount of data currently traveling on the wire, based on the
+# number of ACKs received per time frame. Delaying the timing of the ACKs
+# received results in less data on the wire, time in TCP slowstart is doubled
+# and in congestion avoidance after packet loss the congestion window growth is
+# slowed.  Setting delacktime higher then 100 will to slow downloads as ACKs
+# are queued too long. On low latency 10gig links we find a value of 20ms is
+# optimal. http://www.tel.uva.es/personales/ignmig/pdfs/ogonzalez_NOC05.pdf
+#net.inet.tcp.delayed_ack=1   # (default 1)
+#net.inet.tcp.delacktime=20   # (default 100)
+
+# Do not create a socket or compressed tcpw for TCP connections restricted to
+# the local machine connecting to itself on localhost. An example connection
+# would be a web server and a database server running on the same machine or
+# freebsd jails connecting to each other. 
+#net.inet.tcp.nolocaltimewait=1  # (default 0)
+
+# maximum incoming and outgoing ip4 network queue sizes. (netstat -Q) Increase
+# if queue_drops is greater then zero(0).
+#net.inet.ip.intr_queue_maxlen=2048
+#net.route.netisr_maxqlen=2048
+
+# security settings for jailed environments. it is generally a good idea to
+# separately jail any service which is accessible by an external client like
+# the web or mail server. This is especially true for public facing services.
+# take a look at ezjail, http://forums.freebsd.org/showthread.php?t=16860
+#security.jail.allow_raw_sockets=1       # (default 0)
+#security.jail.enforce_statfs=2          # (default 2)
+#security.jail.set_hostname_allowed=0    # (default 1)
+#security.jail.socket_unixiproute_only=1 # (default 1)
+#security.jail.sysvipc_allowed=0         # (default 0)
+#security.jail.chflags_allowed=0         # (default 0)
+
+# decrease the scheduler maximum time slice for lower latency program calls.
+# by default we use stathz/10 which equals thirteen(13). also, decrease the
+# scheduler maximum time for interactive programs as this is a dedicated
+# server (default 30). Also make sure you look into "kern.hz=100" in /boot/loader.conf
+#kern.sched.interact=5 # (default 30)
+#kern.sched.slice=3    # (default 12)
+
+# increase localhost network buffers. For example, if you run many high
+# bandwidth services on lo0 like an http or local DB server and forward public
+# external traffic using Pf. Also, if running many jails on lo0 then these may
+# help. set to 10x(lo0 mtu 16384 + 40 bytes for header) = 164240
+#net.local.stream.sendspace=164240  # (default 8192)
+#net.local.stream.recvspace=164240  # (default 8192)
+
+# threads per process
+#kern.threads.max_threads_per_proc=9000
+
+# create core dump file on "exited on signal 6"
+#kern.coredump=1             # (default 1)
+#kern.sugid_coredump=1        # (default 0)
+#kern.corefile="/tmp/%N.core" # (default %N.core)
+
+# ZFS L2ARC tuning - If you have read intensive workloads and limited RAM make
+# sure to use an SSD for your L2ARC. Verify noprefetch is enabled(1) and
+# increase the speed at which the system can fill the L2ARC device. By default,
+# when the L2ARC is being populated FreeBSD will only write at 16MB/sec to the
+# SSD. 16MB calculated by adding the speed of write_boost and write_max.
+# 16MB/sec is too slow as many SSD's made today which can easily sustain
+# 500MB/sec. It is recommend to set both write_boost and write_max to at least
+# 256MB each so the L2ARC can be quickly seeded. Contrary to myth, enterprise
+# class SSDs can last for many years under constant read/write abuse of a web
+# server.
+#vfs.zfs.l2arc_noprefetch=1          # (default 1)
+#vfs.zfs.l2arc_write_boost=268435456 # (default 8388608)
+#vfs.zfs.l2arc_write_max=268435456   # (default 8388608)
+
+# ZFS - Set TXG write limit to a lower threshold. This helps "level out" the
+# throughput rate (see "zpool iostat").  A value of 256MB works well for
+# systems with 4 GB of RAM, while 1 GB works well for us w/ 8 GB on disks which
+# have 64 MB cache.
+#vfs.zfs.write_limit_override=1073741824
+
+# For slow drives, set outstanding vdev I/O to "1" to prevent parallel
+# reads/writes per zfs vdev. By limiting read write streams we effectually force
+# drive access into long sequential disk access for drives like a single
+# 5400rpm disk. A value of one is not good for multiple disk spindles.
+#vfs.zfs.vdev.min_pending="1"
+#vfs.zfs.vdev.max_pending="1"
+
+# TCP keep alive can help detecting network errors and signaling connection
+# problems. Keep alives will increase signaling bandwidth used, but as
+# bandwidth utilized by signaling channels is low from its nature, the increase
+# is insignificant. the system will disconnect a dead TCP connection when the
+# remote peer is dead or unresponsive for: 10000 + (5000 x 8) = 50000 msec (50
+# sec)
+#net.inet.tcp.keepidle=10000     # (default 7200000 )
+#net.inet.tcp.keepintvl=5000     # (default 75000 )
+#net.inet.tcp.always_keepalive=1 # (default 1)
+
+
+# UFS hard drive read ahead equivalent to 4 MiB at 32KiB block size. Easily
+# increases read speeds from 60 MB/sec to 80 MB/sec on a single spinning hard
+# drive. Samsung 830 SSD drives went from 310 MB/sec to 372 MB/sec (SATA 6).
+# use Bonnie++ to performance test file system I/O
+#vfs.read_max=128
+
+# global limit for number of sockets in the system. If kern.ipc.numopensockets
+# plus net.inet.tcp.maxtcptw is close to kern.ipc.maxsockets then increase this
+# value
+#kern.ipc.maxsockets = 25600
+
+# spread tcp timer callout load evenly across cpus. We did not see any speed
+# benefit from enabling per cpu timers. The default is off(0)
+#net.inet.tcp.per_cpu_timers = 0
+
+# Increase maxdgram length for jumbo frames (9000 mtu) OSPF routing. Safe for
+# 1500 mtu too.
+#net.inet.raw.maxdgram=9216
+#net.inet.raw.recvspace=9216 
+
+# seeding cryptographic random number generators is provided by the /dev/random
+# device, which provides psudo "real" randomness. The arc4random(3) library call
+# provides a pseudo-random sequence which is generally reckoned to be suitable
+# for simple cryptographic use. The OpenSSL library also provides functions for
+# managing randomness via functions such as RAND_bytes(3) and RAND_add(3). Note
+# that OpenSSL uses the random device /dev/random for seeding automatically.
+# http://manpages.ubuntu.com/manpages/lucid/man4/random.4freebsd.html
+#kern.random.yarrow.gengateinterval=10  # default 10 [4..64]
+#kern.random.yarrow.bins=10             # default 10 [2..16]
+#kern.random.yarrow.fastthresh=192      # default 192 [64..256]
+#kern.random.yarrow.slowthresh=256      # default 256 [64..256]
+#kern.random.yarrow.slowoverthresh=2    # default 2 [1..5]
+#kern.random.sys.seeded=1               # default 1
+#kern.random.sys.harvest.ethernet=1     # default 1
+#kern.random.sys.harvest.point_to_point=1 # default 1
+#kern.random.sys.harvest.interrupt=1    # default 1
+#kern.random.sys.harvest.swi=0          # default 0 and actually does nothing when enabled
+
+# IPv6 Security
+# For more info see http://www.fosslc.org/drupal/content/security-implications-ipv6
+# Disable Node info replies
+# To see this vulnerability in action run `ping6 -a sglAac ::1` or `ping6 -w ::1` on unprotected node
+#net.inet6.icmp6.nodeinfo=0
+# Turn on IPv6 privacy extensions
+# For more info see proposal http://unix.derkeiler.com/Mailing-Lists/FreeBSD/net/2008-06/msg00103.html
+#net.inet6.ip6.use_tempaddr=1
+#net.inet6.ip6.prefer_tempaddr=1
+# Disable ICMP redirect
+#net.inet6.icmp6.rediraccept=0
+# Disable acceptation of RA and auto linklocal generation if you don't use them
+##net.inet6.ip6.accept_rtadv=0
+##net.inet6.ip6.auto_linklocal=0
+
+#
+##
+### EOF ###
+
+# FreeBSD 10.1 -- /etc/rc.conf
+# https://calomel.org/freebsd_network_tuning.html
+#
+#############################################
+
+zfs_enable="YES"
+
+#allscreens_flags="MODE_358"    # higher res console "vidcontrol -i mode; vidcontrol MODE_358"
+clear_tmp_enable="YES"          # clear /tmp on boot
+gateway_enable="YES"            # Enable as LAN gateway
+ipv6_gateway_enable="YES"
+keymap="us.iso.kbd"
+keyrate="250.34"                # keyboard delay to 250 ms and repeat to 34 cps
+
+## PF firewall
+pf_enable="YES"                 # Enable PF (load module if required)
+pf_rules="/etc/pf.conf"         # rules definition file for pf
+pf_flags=""                     # additional flags for pfctl start up
+pflog_enable="YES"              # start pflogd(8)
+pflog_logfile="/var/log/pflog"  # where pflogd should store the logfile
+pflog_flags=""                  # additional flags for pflogd start up
+
+ftpproxy_enable="YES"           # secure ftp proxy
+
+hostname="calomel"
+
+# FIOS: in order to connect the freebsd box directly to the ONT box using the
+# CAT5 cable, set the MAC address (lladdr) to the same value as the FIOS
+# wireless router. Find the MAC on the label on the outside of the FIOS
+# wireless router. If verizon's dhcpd server will not give you an ip you might
+# have to release the old ip. Either disconnect the firewall for 3600 seconds
+# (fios lease timeout) or connect up the fios hardware router and "release ip"
+# manually using the gui button. Ensure LRO and TSO support is disabled on
+# both NICs if this machine is a NAT firewall or router. Recieve and Transmit
+# hardware checksum support is safe to keep enabled (rxcsum and txcsum).
+ifconfig_igb0="dhcp lladdr 11:22:33:44:55:66 -lro -tso"
+ifconfig_igb1="inet 10.10.10.1 netmask 255.255.255.0 -lro -tso"
+
+# ipv6 lan static
+ipv6_activate_all_interfaces="YES"
+ifconfig_igb1_ipv6="inet6 fddd::1 prefixlen 64"
+ipv6_defaultrouter="fddd::1"
+
+## daemons disabled
+dumpdev="NO"
+sendmail_enable="NO"
+sendmail_submit_enable="NO"
+sendmail_outbound_enable="NO"
+sendmail_msp_queue_enable="NO"
+
+#
+##
+### EOF ###
