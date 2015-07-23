@@ -1,0 +1,24 @@
+# https://pypi.python.org/pypi/newrelic_plugin_agent
+
+echo deb http://apt.newrelic.com/debian/ newrelic non-free >> /etc/apt/sources.list.d/newrelic.list
+wget -O- https://download.newrelic.com/548C16BF.gpg | apt-key add -
+apt-get update
+
+apt-get install newrelic-sysmond
+
+nrsysmond-config --set license_key=<your_license_key_here>
+apt-get install python-pip
+
+pip install newrelic-plugin-agent
+
+# if you get the error: check_libyaml.c:2:18: fatal error: yaml.h:
+apt-get install python-yaml
+
+cp /opt/newrelic-plugin-agent/newrelic-plugin-agent.cfg  /etc/newrelic/
+
+#replace  the license key
+vim /etc/newrelic/newrelic-plugin-agent.cfg
+
+newrelic-plugin-agent -c /etc/newrelic/newrelic-plugin-agent.cfg -f
+
+
