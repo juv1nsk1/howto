@@ -21,4 +21,12 @@ vim /etc/newrelic/newrelic-plugin-agent.cfg
 
 newrelic-plugin-agent -c /etc/newrelic/newrelic-plugin-agent.cfg -f
 
+#nginx 2 ways
+
+# php fpm
+vim /etc/php5/fpm/pool.d/www.conf
+pm.status_path = /fpmss
+
+
+
 
