@@ -1,0 +1,54 @@
+
+1) Setup the envinment
+  # create groups
+  groupadd navegg_dev
+  groupdev navegg_sysadm
+  
+  # add www-data to ndev group (optional)
+  usermod -a -G navegg_dev www-data
+  chgrp -R ndev /webdocs
+
+  # force new files to ndev group
+  chmod g+s /webdocs
+  
+  apt-get install acl
+  
+  # clear acts
+  setfacl -b
+  
+  # set group and other permission
+  setfacl -m default:group:navegg_dev:rwx /home/juvinski/
+  setfacl -m default:other:r /webdocs
+
+  # if you get acl error, enable it in /etc/fstab acl option
+  # mount -o remount,acl /
+
+2) add users 
+  
+  # a) add new user with groups
+  useradd -G navegg_dev,navegg_sysadm user1
+  
+  # b) add existing users to groups   (-g to default group and -G to other groups)
+  usermod -a -G navegg_dev,navegg_sysadm user1
+
+3) Access with ssh_key
+
+  cd /home
+  mkdir user1
+  mkdir user1/.ssh
+  chmod 700 user1/.ssh
+  touch user1/.ssh/authorized_keys
+  chown -R user1.ndev user1 
+  chmod 600 user1/.ssh/authorized_keys
+  
+  # create your desktop pub key (identify.pub) with:  ssh-keygen -t dsa
+  # and copy to the server. And then...
+  
+  cat ../identity.pub >> user1/.ssh/authorized_keys
+
+4) centraliza crontab root em navegg
+
+/etc/sudoers
+%_dev ALL=NOPASSWD:supervisorctl *,vim /etc/crontab,tail *, less *, more * 
+%_sysadm ALL=NOPASSWD:ALL
+
