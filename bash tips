@@ -1,0 +1,69 @@
+# Smart commands in bash is very practcal and sexy way to do things. My prefered is {,}
+
+# Backup some file in the boring way
+cp file.conf file.conf.20150810
+# the sexy way
+cp file.conf{,20150810}
+
+# or mv file.conf.sample file.conf  // remove .sample
+mv file.conf{.sample,}
+
+# To run the same command again 
+!!
+ 
+## To run the last command again as root user
+sudo !!
+ 
+ 
+ # Run the most recent command beginning with "service" as root  ( I prefer ctrol+r)
+sudo !service
+
+The !$ use to run command with the last argument of the most recent command:
+
+# find nginx.conf
+ls -la  /etc/nginx/nginx.conf
+ 
+# can edit file  with vi
+sudo vi !$
+
+Home sweet home
+
+Want to go the directory you were just in? Run:
+cd -
+
+Need to quickly return to your home directory? Enter:
+cd
+
+
+The variable CDPATH defines the search path for the directory containing directories:
+
+export CDPATH=/var/www:/nas10
+Now, instead of typing cd /var/www/html/ I can simply type the following to cd into /var/www/html path:
+
+cd html
+
+
+Text formatting
+
+You can reformat each paragraph with fmt command. In this example, I'm going to reformat file by wrapping overlong lines and filling short lines:
+
+fmt file.txt
+You can also split long lines, but do not refill i.e. wrap overlong lines, but do not fill short lines:
+
+fmt -s file.txt
+
+Quickly find differences between two directories
+
+The diff command compare files line by line. It can also compare two directories:
+
+ls -l /tmp/r
+ls -l /tmp/s
+# Compare two folders using diff ##
+diff /tmp/r/ /tmp/s/
+
+See the output and write it to a file
+
+Use the tee command as follows to see the output on screen and also write to a log file named my.log:
+
+mycoolapp arg1 arg2 input.file | tee my.log
+The tee command ensures that you will see mycoolapp output on on the screen and to a file same time.
