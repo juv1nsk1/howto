@@ -1,0 +1,37 @@
+How do fix Error -69760: on OSX by command line 
+
+
+sh-3.2# diskutil eraseDisk JHFS+ Pen8 /dev/disk2 
+Started erase on disk2
+Unmounting disk
+Error: -69760: Unable to write to the last block of the device
+
+
+m0g4:~ juvinski$ diskutil list
+/dev/disk0 (internal):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:      GUID_partition_scheme                         251.0 GB   disk0
+   1:                        EFI EFI                     314.6 MB   disk0s1
+   2:                 Apple_APFS Container disk1         241.3 GB   disk0s2
+   3:       Microsoft Basic Data LINUX                   9.2 GB     disk0s3
+
+/dev/disk1 (synthesized):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:      APFS Container Scheme -                      +241.3 GB   disk1
+                                 Physical Store disk0s2
+   1:                APFS Volume OsX                     175.8 GB   disk1s1
+   2:                APFS Volume Preboot                 19.3 MB    disk1s2
+   3:                APFS Volume Recovery                520.8 MB   disk1s3
+   4:                APFS Volume VM                      3.2 GB     disk1s4
+
+/dev/disk2 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:                                                   *8.1 GB     disk2
+
+sh-3.2# fdisk -i /dev/disk2 
+
+sh-3.2# diskutil umountDisk /dev/disk2
+
+sh-3.2# dd if=AnyImage.ISO of=/dev/disk2
+#or
+sh-3.2# dd bs=64k if=/dev/zero of=/dev/disk2
