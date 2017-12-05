@@ -37,7 +37,7 @@ cd
 
 The variable CDPATH defines the search path for the directory containing directories:
 
-export CDPATH=/var/www:/nas10
+export CDPATH=/var/www:/
 Now, instead of typing cd /var/www/html/ I can simply type the following to cd into /var/www/html path:
 
 cd html
