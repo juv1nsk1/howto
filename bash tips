@@ -67,3 +67,22 @@ Use the tee command as follows to see the output on screen and also write to a l
 
 mycoolapp arg1 arg2 input.file | tee my.log
 The tee command ensures that you will see mycoolapp output on on the screen and to a file same time.
+
+#awk print a specific column 
+
+m0g4:juvinski$ awk -F "," '{print $1}' FILE
+
+#awk to sum column
+
+m0g4:juvinski$ awk 'BEGIN {FS = ","} ; {sum+=$16} END {print sum}' file.csv
+
+
+#Print all the other columns but not the first and the second ones:
+
+$ awk '{$1=$2=""; print $0}' FILE
+
+#Print a range of columns from the first till the fourth:
+
+$ awk -v f=2 -v t=4 '{for(i=f;i<=t;i++) printf("%s%s",$i,(i==t)?"\n":OFS)}' FILE
+
+
