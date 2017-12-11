@@ -15,7 +15,7 @@ mv file.conf{.sample,}
 sudo !!
  
  
- # Run the most recent command beginning with "service" as root  ( I prefer ctrol+r)
+ # Run the most recent command beginning with "service" as root  ( I prefer ctrl+r )
 sudo !service
 
 The !$ use to run command with the last argument of the most recent command:
@@ -85,4 +85,24 @@ $ awk '{$1=$2=""; print $0}' FILE
 
 $ awk -v f=2 -v t=4 '{for(i=f;i<=t;i++) printf("%s%s",$i,(i==t)?"\n":OFS)}' FILE
 
+#join multiple lines (from the same file) with comma:
+$ cat myfile.txt | paste -sd "," -
 
+#iterate lines from a file:
+$ cat myfile.txt | while read line; do echo $line; `#do your thing here`; done
+
+# it can also be used for mysql lines or whatever you want:
+$ mysql myapp -Ne "select name, phone from users" | while read line | do echo $line | awk '{print "user " $1 " with phone " $2}'; done 
+# note: the "-N" arg in mysql is used to skip column names
+
+#If u want be able to execute a binary/command/file from your app anywhere, add it to bash PATH:
+$ export PATH="$PATH:/opt/myapp-cli" #also add it to your bashrc or profile
+
+# replace string "php" for "python" in multiple files:
+$ sed -i 's/php/python/g' /home/g0ulartleo/*.csv
+
+# fast way to see all logged users
+$ w
+
+# broadcast message to all logged users (and all terminals):
+$ echo "Hey there" | wall
