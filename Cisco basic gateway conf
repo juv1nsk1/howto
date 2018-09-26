@@ -27,7 +27,7 @@ ip source-route
 !
 ip cef
 !
-ip dhcp pool dhcpnavegg
+ip dhcp pool dhcpsercer
    network 10.50.0.0 255.255.255.0
    dns-server 8.8.8.8 8.8.4.4 
    default-router 10.50.0.1 
@@ -61,7 +61,7 @@ ip ssh version 2
 !
 !
 interface FastEthernet0/0
- ip dhcp client hostname gwnavegg
+ ip dhcp client hostname gwserver
  ip address dhcp
  ip nat outside
  ip virtual-reassembly
