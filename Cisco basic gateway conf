@@ -1,0 +1,118 @@
+Current configuration : 1763 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname gwserver
+!
+boot-start-marker
+boot-end-marker
+!
+! card type command needed for slot/vwic-slot 0/0
+logging message-counter syslog
+enable secret 5 $BLABLABLA.
+!
+aaa new-model
+!
+!
+!
+!
+aaa session-id common
+!
+dot11 syslog
+ip source-route
+!
+!
+ip cef
+!
+ip dhcp pool dhcpnavegg
+   network 10.50.0.0 255.255.255.0
+   dns-server 8.8.8.8 8.8.4.4 
+   default-router 10.50.0.1 
+   domain-name nvg.im
+!
+!
+ip domain name local.im
+ip name-server 8.8.8.8
+ip name-server 8.8.4.4
+no ipv6 cef
+multilink bundle-name authenticated
+voice-card 0
+!
+!
+!
+!
+!
+username juvinski secret 5 $$#@$@$
+username lauro privilege 15 secret 5 $$@#$@
+username root password 0 blabla
+archive
+ log config
+  hidekeys
+!
+!
+ip ssh authentication-retries 5
+ip ssh source-interface FastEthernet0/1
+ip ssh version 2
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip dhcp client hostname gwnavegg
+ ip address dhcp
+ ip nat outside
+ ip virtual-reassembly
+ duplex auto
+ speed auto
+!
+interface FastEthernet0/1
+ ip address 10.50.0.1 255.255.255.0
+ ip nat inside
+ ip virtual-reassembly
+ duplex auto
+ speed auto
+!
+ip forward-protocol nd
+no ip http server
+no ip http secure-server
+!
+!
+ip dns server
+ip nat inside source list 13 interface FastEthernet0/0 overload
+!
+access-list 13 permit any
+!
+!
+!
+control-plane
+!
+!
+!
+voice-port 0/1/0
+!
+voice-port 0/1/1
+!
+voice-port 0/1/2
+!
+!
+mgcp fax t38 ecm
+mgcp behavior g729-variants static-pt
+!
+!
+!
+!
+!
+line con 0
+line aux 0
+line vty 0 4
+ transport input ssh
+!
+scheduler allocate 20000 1000
+end
+
+I:1
+
+
