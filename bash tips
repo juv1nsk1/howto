@@ -106,3 +106,7 @@ $ w
 
 # broadcast message to all logged users (and all terminals):
 $ echo "Hey there" | wall
+
+# colorise and print all IP addresses and interfaces in a tabular format
+$ ip -br -c addr show
+$ ip -br -c link show
