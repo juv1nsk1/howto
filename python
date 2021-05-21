@@ -1,0 +1,34 @@
+# Create a virtual env
+
+mkdir envname
+python3 -m venv envname
+
+source bin/activate
+
+# install Django 
+pip install Django
+
+# create a project
+django-admin startproject projectname 
+
+# creata the 1st appname
+cd projectname
+python manage.py startapp  appname
+
+# start the server
+python manage.py runserver
+
+
+# hello world example 
+
+vim projectname/settings.py
+# add:  appname to INSTALLED_APPS  array
+
+vim projectname/urls.py to add the route
+# add imports: from appname.views import home
+# add path('', home) to urlpatterns
+
+vim projectname/appname/views.py
+#from django.http import HttpResponse
+# def home(request):
+#    return HttpResponse('Hello world')
