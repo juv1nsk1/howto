@@ -1,0 +1,24 @@
+# 1) control-C + Control+V with command line? 
+$ ls ~ | pbcopy
+$ pbpaste >> clipboard_content.txt
+
+# 2)  text to speech for alert or to conver text to audio 
+$ say "Please, read the f* manual!"
+$ say -f book_draftV123.txt -o audiobook.aiff
+
+
+# 3) easy and fast way to find content in files 
+$ mdfind MyString
+# main options on help
+#
+#     -count      Causes the mdfind command to output the total number of
+#                 matches, instead of the path to the matching items.
+#
+#     -onlyin dir
+#                 Limit the scope of the search to the directory specified.
+#
+#     -name fileName
+#                 Searches for matching file names only.
+
+
+
