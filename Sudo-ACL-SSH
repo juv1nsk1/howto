@@ -1,11 +1,11 @@
 
 1) Setup the envinment
   # create groups
-  groupadd navegg_dev
-  groupdev navegg_sysadm
+  groupadd team_dev
+  groupdev team_sysadm
   
   # add www-data to ndev group (optional)
-  usermod -a -G navegg_dev www-data
+  usermod -a -G team_dev www-data
   chgrp -R ndev /webdocs
 
   # force new files to ndev group
@@ -17,7 +17,7 @@
   setfacl -b
   
   # set group and other permission
-  setfacl -m default:group:navegg_dev:rwx /home/juvinski/
+  setfacl -m default:group:team_dev:rwx /home/juvinski/
   setfacl -m default:other:r /webdocs
 
   # if you get acl error, enable it in /etc/fstab acl option
@@ -26,10 +26,10 @@
 2) add users 
   
   # a) add new user with groups
-  useradd -G navegg_dev,navegg_sysadm user1
+  useradd -G team_dev,team_sysadm user1
   
   # b) add existing users to groups   (-g to default group and -G to other groups)
-  usermod -a -G navegg_dev,navegg_sysadm user1
+  usermod -a -G team_dev,team_sysadm user1
 
 3) Access with ssh_key
 
@@ -46,7 +46,7 @@
   
   cat ../identity.pub >> user1/.ssh/authorized_keys
 
-4) centraliza crontab root em navegg
+4) centraliza crontab root em company
 
 /etc/sudoers
 %_dev ALL=NOPASSWD:supervisorctl *,vim /etc/crontab,tail *, less *, more * 
