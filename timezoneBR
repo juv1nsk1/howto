@@ -1,0 +1,3 @@
+#ubuntu timezone
+timedatectl set-timezone America/Sao_Paulo
+timedatectl
