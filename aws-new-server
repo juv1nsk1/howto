@@ -1,0 +1,41 @@
+#Set server name
+vim /etc/hostname
+
+#set timezone
+rm /etc/localtime
+ln -s /usr/share/zoneinfo/America/Sao_Paulo  /etc/localtime
+
+#http user
+# chown 
+# ~/.profile
+if [ -n "$BASH_VERSION" ]; then
+    # include .bashrc if it exists
+    if [ -f "$HOME/.bashrc" ]; then
+        . "$HOME/.bashrc"
+    fi
+fi
+
+#mysql -client
+apt install mysql-client-core-8.0 
+apt install libmysqlclient-dev 
+
+
+# aws RDS timezone
+# create a parameter group 
+# change timezone to Brazil/East
+# create user 
+# create user 'user'@'%'  IDENTIFIED BY 'pass'; GRANT ALL ON databasename.* TO 'user'@'%';
+
+# python
+apt install python3-pip
+
+# change ssh port
+vim /etc/sshd
+
+# nginx behind Cloudflare IP proxy
+set_real_ip_from 0.0.0.0/0
+real_ip_recursive on;
+real_ip_header CF-Connecting-IP;
+
+
+
