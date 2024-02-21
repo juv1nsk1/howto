@@ -39,3 +39,22 @@ real_ip_header CF-Connecting-IP;
 
 
 
+# addswap
+# add a disk on aws panel
+
+sudo fdisk   /dev/xvds
+p, n, t, 82, w
+#list, create a new, change type to 82 and write
+
+mkswap /dev/xvds1
+swapon /dev/xvds1 
+
+# find the uuid with
+blkid
+
+# auto mount 
+vim /etc/fstab 
+UUID=7ae15b34-eca6-4641-a4aa-264d62172b0b       none    swap     sw     0       0
+
+# check  (or swapon -s)
+free -h
