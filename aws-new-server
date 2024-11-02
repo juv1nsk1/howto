@@ -29,17 +29,21 @@ apt install libmysqlclient-dev
 # python
 apt install python3-pip
 
-# change ssh port
-vim /etc/sshd
+# change ssh port [random number]
+/etc/ssh/sshd_config
+
+# http server
+apt install nginx
 
 # nginx behind Cloudflare IP proxy
+vim /etc/nginx/nginx.conf 
 set_real_ip_from 0.0.0.0/0
 real_ip_recursive on;
 real_ip_header CF-Connecting-IP;
 
 
 
-# addswap
+# addswap disk
 # add a disk on aws panel
 
 sudo fdisk   /dev/xvds
@@ -58,3 +62,21 @@ UUID=7ae15b34-eca6-4641-a4aa-264d62172b0b       none    swap     sw     0       
 
 # check  (or swapon -s)
 free -h
+
+# add file swap
+sudo dd if=/dev/zero of=/swapfile bs=1MB count=1024
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+vim /etc/fstab
+/swapfile swap swap defaults 0 0
+
+# Tuning Swap
+# Swappiness determines how often a Linux system uses the swap space. 
+# The swappiness value is a number between 0 and 200. Below are the steps 
+# to view and adjust swappiness:
+
+cat /proc/sys/vm/swappiness
+
+vim /etc/sysctl.conf
+vm.swappiness = 10 # lower for production server
