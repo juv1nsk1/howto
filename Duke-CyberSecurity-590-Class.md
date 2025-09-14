@@ -1,117 +1,117 @@
-### CyberSecuirty - Ethical Hacking
+# CYBERSEC 590 – Master Program  
+**Ethical Hacking in CyberSecurity Operations**  
+CompTIA Pentest+  
 
-# Links
+⚠️ **Do not hack computer systems you are not authorized to use or use them in ways that are not authorized**  
 
-1. Comprehensive Guide on Dirb Tool
-https://www.hackingarticles.in/comprehensive-guide-on-dirb-tool/
+Professor: *Ryan Linn*  
 
-2. Nikto open-source web server scanner that performs comprehensive tests
-https://highon.coffee/blog/nikto-cheat-sheet/
+---
 
+##  Useful Links
 
-Windows CMD Commands Cheat Sheet
-https://serverspace.io/support/help/windows-cmd-commands-cheat-sheet/
+1. [Metasploit Console Commands – OffSec](https://www.offsec.com/metasploit-unleashed/msfconsole-commands/)  
+2. [Comprehensive Guide on Dirb Tool – HackingArticles](https://www.hackingarticles.in/comprehensive-guide-on-dirb-tool/)  
+3. [Nikto Cheat Sheet – HighOn.Coffee](https://highon.coffee/blog/nikto-cheat-sheet/)  
+4. [Kali Linux](https://www.kali.org/)  
+5. [Ettercap Project](https://www.ettercap-project.org/about.html)  
+6. [Windows CMD Commands Cheat Sheet – Serverspace](https://serverspace.io/support/help/windows-cmd-commands-cheat-sheet/)  
+7. [Linux Commands Cheat Sheet – LinuxTrainingAcademy](https://www.linuxtrainingacademy.com/linux-commands-cheat-sheet/)  
 
-Linux Commands Cheat Sheet
-https://www.linuxtrainingacademy.com/linux-commands-cheat-sheet/
-# Tasks
+---
 
-## nmap
+##  Tasks  
 
-Network scanning starts by identifying your current segment and subnet and searching for devices that are connected to the network.
-Identify your ethernet IP address using the ip a command.
-Next, scan your network using the 
+### 🔍 nmap  
 
-```nmap <Kali_IP_Address/segment_class>``` 
+**Goal:** Map the network, identify active hosts, open ports, and potential vulnerabilities.  
 
-How many machines were found to have opened ports?
-Network scans can provide much more information when using the proper variables.
-Identify the IP address of a machine named "MainServer" and run the 
+1. Find your machine’s IP address:  
+   ```bash
+   ip a
+   ```
 
-```sudo nmap -sS -sV -A <Machine_IP>``` 
+2. Scan your network:  
+   ```bash
+   nmap <Kali_IP_Address/segment_class>
+   ```
+   → *Question:* How many machines were found with open ports?  
 
-Scan using the ```sudo nmap -sV <web-server_IPaddress>``` 
-What is the type and version of the ssh used?
+3. Scan the main server:  
+   ```bash
+   sudo nmap -sS -sV -A <Machine_IP>
+   ```
+   → *Question:* What is the type and version of SSH used?  
 
+4. Check SSH authentication methods:  
+   ```bash
+   sudo nmap -sS -sV -A <Any_linux_machine_name> --script ssh-auth-methods
+   ```
+   → *Question:* Which authentication methods are allowed?  
 
-Network scanning tools like nmap use scripts that can assist with the scan and provide even more details.
-Run the 
+5. Check for Slowloris vulnerability:  
+   ```bash
+   nmap <linux_webserver_machine> --script http-slowloris-check
+   ```
+   → *Question:* What is the vulnerability CVE?  
 
-```sudo nmap -sS -sV -A <Any_linux_macine_name> --script ssh-auth-methods``` 
+---
 
-According to the received output, which authentication methods are allowed?
+### 📂 Dirb  
 
-Network scanning with nmap can also provide you with information regarding vulnerabilities that might exist in the scanned machine.
-Run the 
+**Goal:** Enumerate hidden pages and directories in websites.  
 
-```nmap <linux_webserver_machine> --script http-slowloris-check```
+- Search for specific extensions:  
+  ```bash
+  dirb url -X php
+  ```
 
-According to the output, what is the vulnerability CVE?
+- Basic scan:  
+  ```bash
+  dirb http://exploit.local
+  ```
+  → *Default wordlist used:*  
+  `/usr/share/dirb/wordlists/common.txt`  
 
+- Scan with vulnerability wordlist:  
+  ```bash
+  dirb http://techportal.local /usr/share/dirb/wordlists/vulns/cgis.txt
+  ```
 
-## Dirb
+- Ignore HTTP 400 errors:  
+  ```bash
+  dirb url -N 400
+  ```
 
-The dirb tool is used to scan websites and identify web pages. During a scan, some hotkeys can perform actions while the scan is running.
+- Ignore errors and search for `.php` pages:  
+  ```bash
+  dirb url -N 400 -X php
+  ```
 
-Run the dirb command.
+---
 
-Review the help menu.
+### 🌐 Nikto  
 
-Which of the following options can be used to search for specific file extensions?    ```-X```
+**Goal:** Scan web servers and identify known vulnerabilities.  
 
-Scanning a website requires only one setting: the website address.
+1. Quick help:  
+   ```bash
+   nikto -H
+   ```
 
-A wordlist that the dirb will use against the website for enumeration, vulnerabilities, or else. If not configured, a default wordlist will be used, which contains a list of words used for webpage enumeration.
+2. Main flags:  
+   - Set target: `-url` or `-host`  
+   - Exclude tests: `-Tuning`  
 
-Run the dirb http://exploit.local command and review the output.
+3. Basic scan:  
+   ```bash
+   nikto -url website_name
+   ```
+   → *Question:* Which software is outdated?  
 
-What is the default wordlist file that is being used?
+4. Scan multiple hosts (from a file) and specific ports:  
+   ```bash
+   nikto -h /home/cyberuser/hostlist.txt -p 8080,443
+   ```
 
-```/usr/share/dirb/workdlists/common.txt```
-
-Wordlists can be used for multiple actions. They can be used for web page scanning, brute force attacks, vulnerability scanning, and more.
-
-Rerun the dirb http://techportal.local only this time use the "/usr/share/dirb/wordlists/vulns/cgis.txt" wordlist, which can identify vulnerabilities in cgi pages.
-
-As mentioned, the dirb command provides HTTP response codes, which can provide much useless information, as seen in the previous question. Still, it can also filter unwanted codes to minimize the output.
-
-Rerun the previous command; this time, add the option to ignore all HTTP bad requests (Code 400).
-
-```dirb url -N 400```
-
-The dirb command can also search for specific extensions that might be vulnerable or accessible by an attacker.
-
-Run the scan you performed in the previous question and add the option to search for pages with the  "php"  extension.
-
-```dirb url -N 400 -X php``` 
-
-
-## Nikto
-
- ````nikto -H ``` 
-
-Which two flags can be used to set the target website?
-
-```-url -host```
-
-How can you exclude specific tests from a Nikto scan? 
-
-How can you exclude specific tests from a Nikto scan? 
-
-```- tuning```
-
-Nikto can provide information on the Server the website is running on.
-
-Run the nikto ```-url website_name ```
-
-Nikto can also provide information on the web server software when available.
-Review the output of the scans. Which of the following software is outdated?
-
-You can also use a file containing web server names or IP addresses to scan multiple sites.
-
-Use the /home/cyberuser/hostlist.txt file for the scan and the -p flag to scan ports 8080 and 443.
-
-```-h file -p 8080,443```
-
-
-
+---
