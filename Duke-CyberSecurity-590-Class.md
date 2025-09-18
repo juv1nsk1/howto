@@ -115,3 +115,32 @@ Professor: *Ryan Linn*
    ```
 
 ---
+
+### Wireshark
+
+Create a filter that captures all traffic associated with IPv4 address 192.168.66.20. 
+ip.addr == 192.168.66.20
+
+How many packets use port 53 as a destination port? Consider both TCP and UDP packets.
+tcp.dstport == 53
+udp.dstport == 53
+
+What is the correct syntax for running a query that displays all packets using a source IP of 192.168.200.1, excluding ICMP packets?
+ip.addr==192.168.200.1 and !icmp
+
+ filter that displays all TCP packets with an SYN flag set to 1
+ tcp.flags.syn == 1
+
+ Which of the following filtering queries should be used for viewing email traffic, smaller or equal to 128 bytes per packet?
+ 
+frame.len <= 128 and (smtp or pop or imap)
+
+What is the number of the first DNS Response packet associated with the DNS Request packet marked by number 414?
+
+Each packet in a transport stream is identified by a 13-bit packet identifier (PID).
+To find the packet ID value, locate the DNS request packet by its frame number (No. value) of 414.
+Using the id value shown in the initiated request (id=0x7831), look for the corresponding DNS response packet.
+
+To locate the response packet using the display filter, filter by the associated transaction id- 'dns.id==0x7831'.
+This filter will show all packets associated with this id value (queries and response packets).
+Viewing these results, look for the first response packet frame number (No. value).
