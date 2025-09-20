@@ -17,7 +17,9 @@ Professor: *Ryan Linn*
 5. [Ettercap Project](https://www.ettercap-project.org/about.html)  
 6. [Windows CMD Commands Cheat Sheet – Serverspace](https://serverspace.io/support/help/windows-cmd-commands-cheat-sheet/)  
 7. [Linux Commands Cheat Sheet – LinuxTrainingAcademy](https://www.linuxtrainingacademy.com/linux-commands-cheat-sheet/)  
-
+8. [DNS Hijacking](https://www.sentinelone.com/cybersecurity-101/threat-intelligence/dns-hijacking/)
+9. [Reponder Sniffer](https://www.kali.org/tools/responder/)
+10. 
 ---
 
 ##  Tasks  
@@ -144,3 +146,30 @@ Using the id value shown in the initiated request (id=0x7831), look for the corr
 To locate the response packet using the display filter, filter by the associated transaction id- 'dns.id==0x7831'.
 This filter will show all packets associated with this id value (queries and response packets).
 Viewing these results, look for the first response packet frame number (No. value).
+
+### Reponder
+
+By scanning the systems in the network, it is possible to receive helpful information regarding potential targets, such as SMB signing not required, which allows an attacker to perform a man-in-the-middle attack by relaying captured credentials from one system to another.
+
+Run the sudo python `/usr/share/responder/tools/RunFinger.py -i 10.233.20.0/23` command.
+
+Responder can be used in active or passive mode.
+
+Active mode means actively manipulating the data. It could "break" the network by responding to requests and broadcasts, which could resolve authentication popups to network users that eventually could raise an alarm.
+
+Passive mode is monitoring and analyzing the network traffic, capturing the relevant data and relaying it to other systems, attempting to crack password hashes, or using clear text passwords.
+
+Run the sudo `python /usr/share/responder/Responder.py -h`  command.
+
+Which option prevents the responder from running in active mode?
+
+`-A`
+
+Like other sniffing tools, responder constantly sniffing the network requests and broadcasts. In this question you will use the responder in active mode.
+
+Run responder using the `sudo python /usr/share/responder/Responder.py -wfrP -I eth0`
+
+
+
+
+
