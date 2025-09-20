@@ -19,7 +19,8 @@ Professor: *Ryan Linn*
 7. [Linux Commands Cheat Sheet – LinuxTrainingAcademy](https://www.linuxtrainingacademy.com/linux-commands-cheat-sheet/)  
 8. [DNS Hijacking](https://www.sentinelone.com/cybersecurity-101/threat-intelligence/dns-hijacking/)
 9. [Reponder Sniffer](https://www.kali.org/tools/responder/)
-10. 
+10. [Burp - Intercept HTTP traffic](https://portswigger.net/burp/documentation/desktop/getting-started/intercepting-http-traffic)
+11. 
 ---
 
 ##  Tasks  
