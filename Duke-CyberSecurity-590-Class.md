@@ -25,7 +25,27 @@ Professor: *Ryan Linn*
 13. [Enum4Linux](https://www.kali.org/tools/enum4linux/)
 14. [SMBMap](https://www.kali.org/tools/smbmap/)
 15. [Wmic](https://learn.microsoft.com/en-us/windows/win32/wmisdk/wmic)
-16. 
+16. [Mimikatz](https://www.varonis.com/blog/what-is-mimikatz)
+17. [CrackMapExec](https://github.com/byt3bl33d3r/CrackMapExec)
+18. https://github.com/GhostPack/SafetyKatz
+19. [Lolbas Living Off The Land Binaries ](https://lolbas-project.github.io/)
+20. [Windows privilege escalation](https://github.com/peass-ng/PEASS-ng/tree/master/winPEAS)
+21. [Linux Privilege Escalation](https://github.com/peass-ng/PEASS-ng/tree/master/linPEAS) 
+22. [WMI](https://attack.mitre.org/techniques/T1047/)
+23. https://github.com/GhostPack/Seatbelt
+24. https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon
+25. https://dev.to/saravana_gautham_g/abusing-lolbins-rundll32exe-lab-sysmon-detection-170h
+26. https://github.com/aniqfakhrul/powerview.py
+27. https://github.com/tevora-threat/SharpView
+28. https://github.com/GhostPack/Rubeus
+29. https://github.com/GhostPack/SharpUp
+30. https://owasp.org/
+31. https://www.sans.org/tools
+32. https://github.com/fortra/impacket
+33. https://powersploit.readthedocs.io/en/latest/
+34. https://attack.mitre.org/
+35. https://github.com/redcanaryco/atomic-red-team
+36. https://en.wikipedia.org/wiki/List_of_file_signatures
 ---
 
 ##  Tasks  
@@ -121,6 +141,18 @@ Professor: *Ryan Linn*
    ```bash
    nikto -h /home/cyberuser/hostlist.txt -p 8080,443
    ```
+---
+
+### Metasploit 
+
+msfconsole
+use auxiliary/scanner/smb/smb_version
+show targets
+show payloads
+show options
+
+meterpreter 
+ 
 
 ---
 
@@ -230,3 +262,18 @@ To create an smb shell on the server, run the smbclient //<domainController>/<sh
 Next, use the dir command to view the file list and run the get <file_name> command to download it to the Kali machine.
 Now, run the exit command to return to the Kali, and next run the cat <file_name> to view its content.
 What is the password in the file?
+
+Windows
+sysinfo
+getuid
+getsystem
+hashdump (and CrackMapExec)
+
+whoami /priv
+
+
+Linux
+psexec
+RDP Tunneling
+netsh interface portproxy
+
