@@ -46,6 +46,7 @@ Professor: *Ryan Linn*
 34. https://attack.mitre.org/
 35. https://github.com/redcanaryco/atomic-red-team
 36. https://en.wikipedia.org/wiki/List_of_file_signatures
+37. https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon
 ---
 
 ##  Tasks  
