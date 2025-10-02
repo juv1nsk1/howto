@@ -258,8 +258,6 @@ int main(void)
 }
 ```
 
-Here is section VII. Detection & Defense Evasion exported in Markdown format:
-
 VII. Detection & Defense Evasion
 |	Title	| Description |	Link |
 | :---  | :--- | :--- |
