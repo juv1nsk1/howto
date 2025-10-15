@@ -280,7 +280,7 @@ VII. Detection & Defense Evasion
 
 
 # CTF
-
+```
 docker ps
 nmap -A <ip>
 dirb http://127.0.0.5
@@ -308,5 +308,5 @@ root@032ebafeee2a:~# ls
 flag.txt
 root@032ebafeee2a:~# cat flag.txt 
 e226e2142581eabe9135f823e5d5f85d1065e3d50836b8ddedea62e5cdd10d30ebae671eb59c0e21374868aff6efabb387591a3f59a1f9e886d11392bfdcfad3
-	
+```
 
