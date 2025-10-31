@@ -15,6 +15,11 @@ if [ -n "$BASH_VERSION" ]; then
     fi
 fi
 
+#
+sudo apt update
+sudo apt upgrade
+sudo reboot
+
 #mysql -client
 apt install mysql-client-core-8.0 
 apt install libmysqlclient-dev 
