@@ -23,7 +23,7 @@ sudo reboot
 #mysql -client
 apt install mysql-client-core-8.0 
 apt install libmysqlclient-dev 
-
+sudo apt install build-essential pkg-config 
 
 # aws RDS timezone
 # create a parameter group 
